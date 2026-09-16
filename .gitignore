@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+coverage/
+.DS_Store
+*.log
+.firebase/
+.env*
+!.env.example
+# Capturas de revisión de las puertas de fase: se miran en local, no se versionan
+.capturas/

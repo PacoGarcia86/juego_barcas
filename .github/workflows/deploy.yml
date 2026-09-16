@@ -1,0 +1,49 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Nunca se corta un despliegue a medias: se encola.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # La misma puerta que en cada PR. Un test rojo no llega a Firebase.
+  verificar:
+    uses: ./.github/workflows/ci.yml
+
+  desplegar:
+    needs: verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      # La credencial vive en los secretos del repositorio, nunca en un fichero
+      # [SPEC-005 P-303]. Ver DEPLOYMENT.md para crearla.
+      #
+      # `projectId` va explícito y no se deja resolver desde `.firebaserc`: un
+      # despliegue que adivina a qué proyecto va es un despliegue que algún día
+      # va al proyecto equivocado.
+      - name: Publicar en Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: juego-barcas
+          channelId: live

@@ -1,0 +1,21 @@
+{
+  "name": "Regata 2026 · Carreras de barcas",
+  "short_name": "Regata 2026",
+  "description": "Pilota tu barca, defiende tu posición para que no te adelanten, rompe huevos flotantes para sacar objetos, y compra barcas y tripulantes con los doblones que ganes.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#04121c",
+  "theme_color": "#04121c",
+  "lang": "es",
+  "categories": ["games"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

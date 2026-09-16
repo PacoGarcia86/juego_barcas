@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  # Lo invoca deploy.yml al empujar a main, para que la misma puerta corra antes
+  # de cada despliegue sin duplicar pasos ni ejecutarlos dos veces sobre el
+  # mismo commit [SPEC-005 P-302].
+  workflow_call:
+
+# Aquí no se pide ninguna credencial de nube: el código de un fork nunca puede
+# llegar a Firebase. El despliegue vive en deploy.yml.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 ejecuta los .ts directamente por borrado de tipos nativo, de lo
+      # que depende la suite entera [B-904]. No bajar de 22.18.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tipos
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Construir
+        run: npm run build
+
+      # [SPEC-001 §7] La puerta de realismo. Una regresión de regata —la barca
+      # larga que gana siempre, el jugador al que nadie adelanta nunca— rompe la
+      # integración continua igual que un test rojo.
+      - name: Puerta de realismo
+        run: npm run baseline
+
+      # [SPEC-002 HG1] La ayuda de los objetos no puede prometer efectos que la
+      # ruleta no reparta.
+      - name: Auditoría de los objetos
+        run: npm run objetos-audit
+
+      - name: Comprobar que el manifiesto y los iconos se publican
+        run: |
+          for f in dist/manifest.json dist/icon-192.png dist/icon-512.png \
+                   dist/icon-maskable-512.png dist/apple-touch-icon.png dist/sw.js; do
+            test -f "$f" || { echo "::error::falta $f en dist/"; exit 1; }
+          done
