@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | SPEC-004 |
 | **Título** | El agua se mueve, la barca cabecea sobre ella y la cámara mira por donde va el circuito |
-| **Estado** | ✅ `COMPLETADA` (Fase R1) |
+| **Estado** | ✅ `COMPLETADA` (Fases R1 y R2) |
 | **Autor** | — |
 | **Creado** | 2026-09-16 |
 | **Módulos afectados** | `src/render/**`, `src/juego/motor.ts`, `src/components/Lienzo.tsx` |
@@ -59,8 +59,9 @@ sobra. **No vuelvas a proponerlo sin traer una medición de tiempo de carga en 4
 - **El render no calcula regata.** Ni posiciones, ni colisiones, ni objetos. Lee `EstadoRegata`.
 - **No hay reflejos de trazado de rayos ni refracción real.** Fresnel aproximado y color por
   profundidad.
-- **No hay modelos importados.** Todas las mallas son procedurales: un `.glb` es un fichero que
-  bajar, y `1.1` explica por qué eso importa.
+- **No se cargan modelos en marcha.** Un `.glb` es un fichero que bajar, y `1.1` explica por qué
+  eso importa. La lancha se modela en Blender pero llega **como dato TS** dentro del bundle
+  (`R-303`); el resto de mallas son procedurales.
 
 ---
 
@@ -75,6 +76,7 @@ sobra. **No vuelvas a proponerlo sin traer una medición de tiempo de carga en 4
 | **DR5** | `trazado.ts` | El render acumulaba su propia distancia recorrida | Boyas y barcas divergían **hasta 11 m** tras 3 vueltas | Las barcas pasaban por dentro de las boyas |
 | **DR6** | `trazado.ts` | El error de cierre se repartía MOVIENDO los puntos | `faro` declara 1 380 m de vuelta y la polilínea medía **1 037 m**: el mundo encogido un 25 %, y desigualmente —22 m del motor eran 9,2 m en un sitio y 28,9 m en otro | La cámara se coloca «22 m por detrás» y acababa **dentro** de la barca del jugador. El test de `R-101` estaba en verde: la polilínea cerraba con menos de metro y medio |
 | **DR7** | `datos/circuitos.ts` | Las curvas de un circuito no sumaban una vuelta | `faro`: giro total **−0,24 rad** de los 6,28 que hacen falta. `ria`: 3,07 | Ningún arreglo de cierre podía salvarlos: no eran circuitos, eran caminos |
+| **DR8** | `flota.ts` | El calado no sabía dónde estaba el suelo de la bañera (Fase R2) | Galeota cargada: flotación a **−0,155** puntales, suelo a **−0,325** | El agua tapaba la bañera: de la lancha solo asomaban la regala y la consola |
 
 ---
 
@@ -86,7 +88,8 @@ src/render/
   tresd/
     trazado.ts       NUEVO  Circuito → eje en el mundo. PURO          [R-1xx]
     agua.ts          NUEVO  Gerstner, espuma, estela                  [R-2xx]
-    barca.ts         NUEVO  Malla procedural de casco y remos         [R-3xx]
+    barca.ts         NUEVO  Lancha → geometría unitaria, trima        [R-3xx]
+    modelos.ts       R2     La lancha modelada en Blender (dato)     [R-303]
     flota.ts         NUEVO  Las 8 barcas en pocas llamadas            [R-302]
     mundo.ts         NUEVO  Cielo, costa, islas, boyas, huevos        [R-4xx]
     vista.ts         NUEVO  Renderizador y cámara. Lo único que toca GL [R-5xx]
@@ -126,10 +129,11 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | ID | Requisito | Aceptación |
 |---|---|---|
 | **R-301** | **Cada barca se posa sobre el agua**: su altura es `alturaDeOla` en su `(x, z)`, y su cabeceo y balanceo salen de la pendiente de la ola en dos puntos separados por la eslora y la manga (`DR1`) | El cabeceo varía más de 2° en 30 s con `oleaje ≥ 0,4` |
-| **R-302** | **Las 8 barcas van en pocas llamadas de dibujo** (`DR2`): una geometría por tipo de casco, instanciada, con el color por instancia | ≤ **6 llamadas de dibujo** para la flota entera, comprobable en `?diagnostico=1` |
-| **R-303** | La malla del casco es procedural y sale de la `eslora`, la `manga` y el `casco` de la barca: una traiñera de 14 m se ve larga y estrecha; una neumática, corta y ancha | La relación eslora/manga de la malla coincide con la del dato ± 5 % |
-| **R-304** | Los remos se mueven con la fracción de empuje, no con el reloj: a empuje 0 están quietos | — |
+| **R-302** | **Las 8 barcas van en pocas llamadas de dibujo** (`DR2`): una sola geometría (la lancha, `R-303`), instanciada, con el color por instancia | ≤ **6 llamadas de dibujo** para la flota entera, comprobable en `?diagnostico=1` |
+| **R-303** | **Todas las barcas son una lancha modelada en Blender** (`arte/barcas/`: `modelar.py` → `barcas.blend` → `exportar.py` → `src/render/tresd/modelos.ts`): la lancha de consola de `lancha_low_poly.glb`, de la que se reutilizan motor y timón. **Sin vela ni remos**: una lancha con motor no los lleva. El tipo de casco (`planeador` / `desplazamiento`) sigue mandando en la física (`B-203`), no en la malla. Se exporta como **dato unitario** —1 de eslora, 1 de manga, regala a 0— sin cargar ningún fichero en marcha, y se escalan con la `eslora` y la `manga` de cada barca: una traiñera de 14 m se ve larga y estrecha; una neumática, corta y ancha | La relación eslora/manga del casco pintado coincide con la del dato ± 5 %; la línea de flotación usa la quilla del modelo, no una constante |
+| **R-304** | **La lancha levanta la proa con el empuje pedido**, no con el reloj: a gas 0 va plana, a tope y en marcha encabuza hasta ~4°. (Antes: los remos se movían con el empuje; la lancha no lleva remos) | `trimaDeProa(0, v) = 0`; crece con el gas y con la velocidad; tope 4° |
 | **R-305** | El casco se hunde con el desplazamiento: una barca con 5 tripulantes va más metida en el agua | El calado de la malla crece con `masa` |
+| **R-306** | **Cada cara del modelo lleva una pintura**: `casco` y `franja` (con una luz que las oscurece, p. ej. el fondo) toman el color de la barca **por instancia**; el resto (fibra, madera, motor, cristal) es color fijo del modelo. Sin materiales múltiples: las ocho lanchas son UNA `InstancedMesh` (`R-302`) | Ocho barcas con colores distintos se dibujan en la misma `InstancedMesh`; flota ≤ 6 llamadas |
 
 ### R-4xx · El mundo
 
@@ -176,6 +180,7 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | DR3 | `[R-501]` el punto de mira en la curva está dentro del circuito |
 | DR4 | `[R-202]` la malla del agua no pasa de 90 000 vértices |
 | DR5 | `[R-102]` el trazado cierra y no acumula distancia propia |
+| DR8 | `[R-305]` la flotación nunca pasa por encima del suelo de la bañera |
 
 ### 6.3 Lo que un test no puede ver
 
@@ -190,6 +195,9 @@ todos los tests en verde. Antes de cerrar una fase que toque `render/`, abre el 
 |---|---|---|
 | `R-101` | «El trazado cierra: distancia entre el primer y el último punto < 1,5 m». Y así se implementó: repartiendo el error de cierre entre todos los puntos | **El criterio era insuficiente y estaba en verde con el mundo roto.** Una polilínea puede cerrar perfectamente y medir un 25 % menos de lo que declara, que es justo lo que pasaba en `faro`. Faltaba la otra mitad del contrato: que el PERÍMETRO sea la vuelta (`R-106`). El defecto no se vio en ningún test — se vio en una captura, con la cámara metida dentro de la barca del jugador |
 | `R-101` | Daba por hecho que cualquier lista de tramos se podía cerrar | Un circuito cuyas curvas no suman una vuelta entera no es un circuito. Los cuatro estaban mal: `faro` giraba **−0,24 rad** de los 6,28 necesarios. Se arreglaron los datos y se añadió `R-105` para que no vuelva a colarse |
+| `R-305` | «El calado de la malla crece con `masa`», con `calado = 0,3 + …` pensado para un casco unitario con la quilla en −1 | **La cuenta dependía de la forma del casco y nadie lo decía.** Con la lancha (quilla −0,552) las barcas iban volando; subido a 0,4–0,72, **el agua se dibujaba por encima del suelo de la bañera** (`DR8`): flotación a −0,155 puntales contra suelo a −0,325 en la galeota. Con 153 tests en verde, en la captura solo asomaban la regala y la consola. Se subió el suelo en el modelo, `caladoDe` pasa a 0,21–0,45 y `[R-305]` comprueba la holgura en todo el rango de masas |
+| `R-401` | Se daba por hecho que un modelo exportado podía traer sus colores | El primer `modelos.ts` llevaba los colores fijos en hexadecimal y `[R-401]` lo tumbó. El modelo nombra el material; el color vive en `paleta.ts` (`MATERIALES_DE_BARCA`) |
+| `R-302` | Fase R1: «15 llamadas, 5 de la flota» | La versión de R1, medida de nuevo con el arnés de capturas, dio **16**. La diferencia es lo que haya en pantalla (huevos, objetos), no la flota: sirve de aviso para no comparar llamadas entre capturas distintas |
 
 ---
 
@@ -215,6 +223,30 @@ circuitos abiertos en Chromium, sin un solo error de consola.
 **Las cifras de fotogramas de la captura no valen como medida de `RG2`**: el navegador del arnés
 dibuja por software (SwiftShader), no con la tarjeta gráfica. Lo que sí vale de ahí son las
 llamadas de dibujo, los triángulos y —sobre todo— lo que se ve.
+
+### Fase R2 — Barcas modeladas en Blender · ✅ **CERRADA 2026-09-17**
+**Alcance:** `R-302`, `R-303` y `R-304` (reescritos), `R-305` (calado ligado al modelo) y `R-306`
+**Puerta:** `modelos.ts` regenerable desde `arte/barcas/` con Blender en modo `-b`; tests `[R-303]`,
+`[R-304]` y `[R-306]` en verde; flota ≤ 6 llamadas de dibujo en `?diagnostico=1`; las ocho barcas se ven posadas
+sobre el agua —ni flotando por encima ni con la regala hundida— en un navegador de verdad.
+**Resultado:** 153 tests en verde · `tsc --noEmit` limpio · `vite build` correcto · `modelar.py` y
+`exportar.py` corridos con Blender 5.2.1 en `-b` · `El Canal` y `La Ría` abiertos en Chrome, sin
+errores de consola. No toca física, IA, objetos ni circuito: **no aplica `baseline`**.
+
+| Comprobación | Resultado |
+|---|---|
+| `R-303` · malla exportada | **835 vértices, 1 112 triángulos**, `modelos.ts` de 33 KB |
+| `R-303` · casco pintado, medida unitaria | manga **0,983** · eslora **1,000** (tolerancia ± 0,05) |
+| `R-303` · quilla del modelo | **−0,552 puntales** (antes, constante −1) |
+| `R-304` · trima a gas 0 / tope | **0°** / **4,00°** |
+| `R-305` · calado, barca más ligera → más cargada | **0,212 → 0,450** de la profundidad de quilla |
+| `R-305` · holgura mínima suelo − flotación, 300–3 000 kg | **0,057 puntales** (umbral del test 0,04) |
+| `R-302` · llamadas de dibujo, escena completa | **10 – 11** (antes 16 medidas con el mismo arnés); flota **2** (umbral ≤ 6) |
+| `R-302` · triángulos, escena completa | **70 k** (antes 57 k) |
+| `R-306` · lanchas de colores distintos | las 8 en **una** `InstancedMesh` |
+
+**Lo que se vio en las capturas y ningún test veía:** la bañera inundada (`DR8`). Está en
+«Lo que la medición cambió».
 
 ---
 
@@ -264,3 +296,4 @@ export function alturaDeOla(x: number, z: number, t: number, oleaje: number): nu
 | DR5 · distancia duplicada | `R-102` | R1 | ✅ | `[R-102] el trazado cierra` |
 | DR6 · mundo encogido un 25 % | `R-106` | R1 | ✅ | `[R-106] un metro del motor es un metro del mundo` |
 | DR7 · circuitos que no giran una vuelta | `R-105` | R1 | ✅ | `[R-105] un circuito cerrado gira una vuelta entera` |
+| DR8 · bañera inundada | `R-305` | R2 | ✅ | `[R-305] la flotación nunca pasa por encima del suelo de la bañera` |

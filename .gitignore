@@ -9,3 +9,4 @@ coverage/
 !.env.example
 # Capturas de revisión de las puertas de fase: se miran en local, no se versionan
 .capturas/
+*.blend1

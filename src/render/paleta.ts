@@ -127,3 +127,21 @@ export function colorDeCasco(colores: { casco: string; franja: string; vela: str
 } {
   return colores;
 }
+
+/**
+ * [R-306] Los colores FIJOS de la lancha de Blender: lo que no se pinta con los
+ * colores de la barca. El modelo (`modelos.ts`) solo nombra el material; el
+ * color vive aquí, como todos los del render. Los materiales de
+ * `arte/barcas/modelar.py` llevan los mismos, pero allí solo son de muestra.
+ */
+export const MATERIALES_DE_BARCA = {
+  defensa: '#23262b',
+  fibra: '#e6e0d0',
+  suelo: '#b7b09f',
+  tablero: '#2b2f36',
+  cristal: '#3f5d70',
+  motor: '#2a2d33',
+  motor_tapa: '#dfe3e8',
+} as const;
+
+export type MaterialDeBarca = keyof typeof MATERIALES_DE_BARCA;
