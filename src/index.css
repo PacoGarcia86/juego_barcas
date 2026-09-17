@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Regata 2026 — sistema visual «Agua honda»
+   Azules profundos, latón y espuma. El relieve sale de sombras
+   y degradados, no de bordes: un borde gris de 1 px es lo que
+   hace que una interfaz parezca de 2014.
+   Móvil primero: esto se juega con los dos pulgares.
+   ============================================================ */
+
+@theme {
+  /* -- Fondo, de más hondo a más cerca -- */
+  --color-honda-900: #04121c;
+  --color-honda-800: #071a27;
+  --color-honda-700: #0b2434;
+  --color-honda-600: #113044;
+  --color-honda-500: #193f56;
+  --color-honda-400: #24536e;
+
+  /* -- Tinta sobre fondo oscuro. Número alto = más claro. -- */
+  --color-tinta-100: #64798a;
+  --color-tinta-200: #869aab;
+  --color-tinta-300: #a6b8c7;
+  --color-tinta-400: #c7d6e2;
+  --color-tinta-500: #e9f2f8;
+
+  /* -- Latón: el acento del juego -- */
+  --color-laton-300: #7a5a18;
+  --color-laton-400: #b98c1f;
+  --color-laton-500: #f2c14e;
+  --color-laton-600: #ffd977;
+
+  /* -- Estados -- */
+  --color-bien: #2ec27e;
+  --color-mal: #e5484d;
+  --color-ojo: #f5a524;
+  --color-dato: #3b9dff;
+
+  --font-titulo: "Archivo Black", "Helvetica Neue", Impact, system-ui, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+
+  --ease-suave: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  color-scheme: dark;
+  --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --sombra-md: 0 2px 6px -2px rgba(0, 0, 0, 0.5), 0 12px 28px -14px rgba(0, 0, 0, 0.75),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  --sombra-lg: 0 8px 20px -8px rgba(0, 0, 0, 0.6), 0 30px 60px -24px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  --safe-b: 0px;
+  --safe-t: 0px;
+}
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  :root {
+    --safe-b: env(safe-area-inset-bottom);
+    --safe-t: env(safe-area-inset-top);
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-honda-900);
+  color: var(--color-tinta-400);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* Esto no se lee: se juega. Nada de selección accidental al arrastrar. */
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.titulo {
+  font-family: var(--font-titulo);
+  letter-spacing: -0.01em;
+}
+
+.tarjeta {
+  background: linear-gradient(160deg, var(--color-honda-600), var(--color-honda-800));
+  border-radius: 1rem;
+  box-shadow: var(--sombra-md);
+}
+
+.tarjeta-plana {
+  background: var(--color-honda-700);
+  border-radius: 0.75rem;
+  box-shadow: var(--sombra-sm);
+}
+
+.boton {
+  padding: 0.6rem 1rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(170deg, var(--color-honda-500), var(--color-honda-700));
+  color: var(--color-tinta-500);
+  font-weight: 600;
+  box-shadow: var(--sombra-sm);
+  transition: transform 0.12s var(--ease-suave), filter 0.12s var(--ease-suave);
+  cursor: pointer;
+}
+
+.boton:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+.boton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.boton-laton {
+  background: linear-gradient(170deg, var(--color-laton-500), var(--color-laton-300));
+  color: var(--color-honda-900);
+}
+
+.barra {
+  height: 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.barra > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.18s var(--ease-suave);
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+.entrar {
+  animation: entrar 0.32s var(--ease-suave) both;
+}
+
+@keyframes latir {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.latir {
+  animation: latir 0.9s ease-in-out infinite;
+}
