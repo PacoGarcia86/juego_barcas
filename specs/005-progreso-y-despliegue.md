@@ -59,6 +59,7 @@ al arrancar porque no puede guardar es un juego roto para una parte real de la g
 | **DP1** | `progreso.ts` | `localStorage` sin `try/catch` | El juego no arrancaba en Safari privado: **excepción en el primer render** (N=1) | Pantalla en blanco |
 | **DP2** | `progreso.ts` | Sin número de versión en el guardado | Un cambio del catálogo dejó partidas con `barcaEquipada` inexistente: **`undefined` al entrar en regata** (N=1) | Partida irrecuperable |
 | **DP3** | `vite.config.ts` | Dos `<link rel="manifest">`: el del plugin y el de `index.html` | La pantalla de inicio de Android cogió el nombre del plugin, no el del juego (N=1) | Icono y nombre equivocados |
+| **DP4** | `firebase.json` | La regla `**/*.@(html\|json)` encaja con `/index.html` escrito, pero **no con lo que se pide**: `/` y los enlaces profundos reescritos | Medido sobre el despliegue real: `/`, `/<ruta inventada>` y los iconos volvían con `Cache-Control: max-age=3600`; solo `/index.html` literal daba `no-cache` (N=1) | El navegador sirve el armazón viejo hasta una hora tras desplegar |
 
 ---
 
@@ -100,7 +101,7 @@ Así se prueba sin navegador y `PG2` es comprobable con un almacén que lanza.
 
 | ID | Requisito | Aceptación |
 |---|---|---|
-| **P-301** | `firebase.json` declara la caché: `/assets/**` inmutable un año (llevan hash), `*.html` y `*.json` sin caché, `/sw.js` sin caché, y reescritura de todo a `/index.html` | Las cuatro reglas están en el fichero |
+| **P-301** | `firebase.json` declara la caché **por lo que se sirve, no por lo que se escribe** (`DP4`): `/assets/**` inmutable un año (llevan hash) y **todo lo demás sin caché** —`/`, los enlaces profundos reescritos a `/index.html`, `/sw.js`, `/manifest.json` y los iconos, que no llevan hash—. Una regla `**` sin caché **seguida** de `/assets/**` inmutable: cuando dos reglas encajan gana la última, medido sobre un canal de vista previa | La respuesta **servida** en `/`, `/<ruta inventada>`, `/sw.js` y `/manifest.json` lleva `Cache-Control: no-cache`, y la de `/assets/*.js` lleva `max-age=31536000, immutable`. Se comprueba con `curl -D -` contra el despliegue, no leyendo el fichero |
 | **P-302** | `deploy.yml` **reutiliza `ci.yml`** con `workflow_call`: la misma puerta que un PR corre antes de cada despliegue, sin duplicar pasos | `deploy.yml` tiene `uses: ./.github/workflows/ci.yml` |
 | **P-303** | La credencial de Firebase vive en los secretos del repositorio (`FIREBASE_SERVICE_ACCOUNT`), **nunca en un fichero**. `projectId` va explícito en el flujo de trabajo, no se resuelve desde `.firebaserc` | `grep` de la credencial en el repositorio no encuentra nada; `projectId: juego-barcas` está escrito |
 | **P-304** | `ci.yml` no pide ninguna credencial de nube: el código de un fork nunca puede llegar a Firebase | `ci.yml` tiene `permissions: contents: read` y ningún secreto |
@@ -116,6 +117,7 @@ Así se prueba sin navegador y `PG2` es comprobable con un almacén que lanza.
 | DP1 | `[P-104]` con un almacén que lanza, `cargar` devuelve `null` y no revienta |
 | DP2 | `[P-102]` un guardado con barca inexistente se migra a una jugable |
 | DP3 | CI: `dist/index.html` tiene exactamente un `<link rel="manifest">` |
+| DP4 | `[P-301]` la cabecera **servida** en `/` y en una ruta inventada es `no-cache`, y la de `/assets/*.js` inmutable |
 
 ### 6.2 No-regresión
 
@@ -181,3 +183,4 @@ export function migrar(bruto: unknown): Partida | null;
 | DP1 · almacén que lanza | `P-104` | P1 | ✅ | `[P-104] el almacén puede lanzar` |
 | DP2 · guardado sin versión | `P-102` | P1 | ✅ | `[P-102] una partida vieja se migra` |
 | DP3 · dos manifiestos | `P-201` | P1 | ✅ | CI |
+| DP4 · el armazón se cachea una hora | `P-301` | P1 | ✅ | Medido con `curl -D -` sobre canal de vista previa |

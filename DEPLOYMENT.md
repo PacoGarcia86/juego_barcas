@@ -58,9 +58,20 @@ que hay que declarar [P-301]:
 | Qué | Cómo se sirve | Por qué |
 |---|---|---|
 | `/assets/**` | `max-age=31536000, immutable` | Llevan hash en el nombre: son inmutables por construcción |
-| `*.html`, `*.json` | `no-cache` | Si no, un despliegue tardaría un año en verse |
-| `/sw.js` | `no-cache` | El service worker tiene que poder sustituirse a sí mismo |
-| Cualquier otra ruta | reescritura a `/index.html` | Es una aplicación de una sola página |
+| Todo lo demás | `no-cache` | El armazón, el manifiesto, el service worker y los iconos no llevan hash: tienen que poder sustituirse |
+| Cualquier ruta que no sea un fichero | reescritura a `/index.html` | Es una aplicación de una sola página |
+
+Las dos reglas de cabecera van **en ese orden y no en otro**: `**` sin caché primero, `/assets/**`
+inmutable después. Cuando dos reglas encajan con la misma petición, **gana la última** — medido
+sobre un canal de vista previa, no deducido. Invertirlas dejaría el código con `no-cache` y tiraría
+por tierra el único caché que importa.
+
+> **Por qué no basta con `**/*.@(html|json)`** (`DP4`). Esa regla encaja con el fichero
+> `/index.html`, pero un navegador no pide `/index.html`: pide `/`, o un enlace profundo que la
+> reescritura lleva a `/index.html`. Firebase decide las cabeceras por **la ruta pedida**, no por el
+> destino de la reescritura, así que la portada salía con `max-age=3600` y el juego tardaba una
+> hora en actualizarse. Se comprueba con `curl -D - https://juego-barcas.web.app/`, nunca leyendo
+> `firebase.json`.
 
 ---
 
