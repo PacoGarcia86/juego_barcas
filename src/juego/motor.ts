@@ -5,26 +5,51 @@
 // que es lo que hace que `B-901` —misma semilla, misma regata— siga siendo
 // cierto en un móvil que se atasca.
 
-import { avanzar, crearRegata, PASO, resultadoDe, type Inscripcion } from '../engine/carrera.ts';
+import { avanzar, crearRegata, CUENTA_ATRAS, PASO, resultadoDe, type Inscripcion } from '../engine/carrera.ts';
 import { clasificar } from '../engine/clasificacion.ts';
 import { doblonesDe } from '../engine/economia.ts';
 import { huevosDe } from '../engine/huevos.ts';
 import { crearRng, type Rng } from '../engine/rng.ts';
-import type { Circuito, EstadoRegata, Mando, Resultado } from '../engine/tipos.ts';
+import { RITMO } from '../engine/ritmo.ts';
+import type { Aviso, Circuito, EstadoRegata, Mando, Resultado } from '../engine/tipos.ts';
 
-/** Tope de pasos por fotograma: si la pestaña vuelve de segundo plano tras un
- *  minuto, no se simulan mil segundos de golpe y se cuelga el navegador. */
+/** Tope de pasos por fotograma y por unidad de `RITMO`: si la pestaña vuelve
+ *  de segundo plano tras un minuto, no se simulan mil segundos de golpe y se
+ *  cuelga el navegador. */
 const TOPE_PASOS = 6;
+
+/** [K-303] Avisos que se guardan, como mucho: el tablero solo enseña los recientes. */
+const TOPE_AVISOS = 40;
+
+/** [K-303] Un aviso con la hora de la regata (s de simulación) a la que pasó. */
+export interface AvisoFechado {
+  reloj: number;
+  aviso: Aviso;
+}
 
 export class MotorDeRegata {
   private estado: EstadoRegata;
   private readonly rng: Rng;
   private acumulado = 0;
   private resultado: Resultado | null = null;
+  /**
+   * [K-303] El motor deja en `est.avisos` solo los del último tick, y React no
+   * pinta cada tick: aquí se acumulan para que ninguno se pierda.
+   */
+  private registro: AvisoFechado[] = [];
 
-  constructor(circuito: Circuito, inscritos: Inscripcion[], semilla: number) {
+  /**
+   * [K-101] `ritmo` son segundos de simulación por segundo real. Solo cambia
+   * cuántos pasos caben en un fotograma: la secuencia de estados es la misma
+   * con cualquier ritmo, y por eso `B-901` sigue siendo cierto.
+   */
+  readonly ritmo: number;
+
+  constructor(circuito: Circuito, inscritos: Inscripcion[], semilla: number, ritmo: number = RITMO) {
+    this.ritmo = ritmo;
     this.rng = crearRng(semilla);
-    this.estado = crearRegata(circuito, inscritos, this.rng, huevosDe(circuito));
+    // [K-202] En el juego se sale siempre con cuenta atrás.
+    this.estado = crearRegata(circuito, inscritos, this.rng, huevosDe(circuito), { cuentaAtras: CUENTA_ATRAS });
   }
 
   get est(): EstadoRegata {
@@ -40,15 +65,17 @@ export class MotorDeRegata {
     return this.estado.naves.findIndex((n) => n.jugador);
   }
 
-  /** [R-601] Avanza el tiempo real `dt` en pasos fijos de `PASO`. */
+  /** [R-601] [K-101] Avanza el tiempo real `dt` —`ritmo·dt` de simulación— en pasos fijos de `PASO`. */
   tictac(dt: number, mando: Mando): void {
     if (this.estado.terminada) return;
-    this.acumulado += Math.min(dt, TOPE_PASOS * PASO);
+    const tope = Math.ceil(TOPE_PASOS * this.ritmo);
+    this.acumulado += Math.min(dt * this.ritmo, tope * PASO);
     let pasos = 0;
-    while (this.acumulado >= PASO && pasos < TOPE_PASOS && !this.estado.terminada) {
+    while (this.acumulado >= PASO && pasos < tope && !this.estado.terminada) {
       const jugador = this.estado.naves[this.jugador];
       const ultimaVuelta = jugador !== undefined && jugador.vuelta >= this.estado.circuito.vueltas - 1;
       this.estado = avanzar(this.estado, { mando, ultimaVuelta }, this.rng);
+      for (const aviso of this.estado.avisos) this.registro.push({ reloj: this.estado.reloj, aviso });
       this.acumulado -= PASO;
       pasos++;
     }
@@ -56,6 +83,13 @@ export class MotorDeRegata {
       const r = resultadoDe(this.estado, 0);
       this.resultado = { ...r, doblones: doblonesDe(r) };
     }
+  }
+
+  /** [K-303] Los avisos de los últimos `segundosReales` de pantalla, del más viejo al más nuevo. */
+  avisosRecientes(segundosReales: number): AvisoFechado[] {
+    if (this.registro.length > TOPE_AVISOS) this.registro = this.registro.slice(-TOPE_AVISOS);
+    const desde = this.estado.reloj - segundosReales * this.ritmo;
+    return this.registro.filter((a) => a.reloj >= desde);
   }
 
   /** [B-701] El resultado, una vez bajada la bandera. */

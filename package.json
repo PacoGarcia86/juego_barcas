@@ -13,7 +13,8 @@
     "icons": "node scripts/generar-iconos.mjs",
     "regata-humo": "node scripts/regata-humo.ts",
     "baseline": "node scripts/baseline.ts",
-    "objetos-audit": "node scripts/objetos-audit.ts"
+    "objetos-audit": "node scripts/objetos-audit.ts",
+    "diversion": "node scripts/diversion.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

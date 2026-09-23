@@ -21,6 +21,7 @@ import { paletaDe, type Paleta } from '../paleta.ts';
 import { Agua } from './agua.ts';
 import { Flota } from './flota.ts';
 import { Mundo } from './mundo.ts';
+import { FOV_PARADO, fovPara } from './encuadre.ts';
 import { construirTrazado, lateralDe, puntoDeMira, puntoEn, rumboEn, type Trazado } from './trazado.ts';
 
 /**
@@ -41,8 +42,6 @@ const RETRASO_POR_ESLORA = 1.15;
 /** [R-501] Altura de la cámara sobre el agua. A ras de agua no se ve el circuito. */
 const ALTURA = 5.8;
 /** [R-503] Campo de visión parado y lanzado, en grados. */
-const FOV_PARADO = 62;
-const FOV_LANZADO = 76;
 /** [R-603] Milisegundos por fotograma por encima de los cuales se simplifica. */
 const PRESUPUESTO = 30;
 /** Fotogramas seguidos malos antes de bajar la calidad. */
@@ -53,6 +52,8 @@ export interface Diagnostico {
   llamadas: number;
   triangulos: number;
   simplificado: boolean;
+  /** [K-301] FOV del fotograma, en grados: la puerta de K3 se comprueba en una captura. */
+  fov: number;
 }
 
 export class Vista {
@@ -70,11 +71,21 @@ export class Vista {
   private metrosCamara = 0;
   private lateralCamara = 0;
   private fovActual = FOV_PARADO;
+  /** [K-101] Segundos REALES desde que se abrió la vista. El mar va con este. */
+  private tiempoMar = 0;
   private malos = 0;
   private simplificado = false;
   private ultimoFps = 60;
 
-  constructor(lienzo: HTMLCanvasElement, est: EstadoRegata) {
+  /**
+   * [K-301] `encuadre` llega de arriba porque el render solo importa TIPOS del
+   * motor (`H-209`): el ritmo y la velocidad de casco de la barca seguida los
+   * calcula quien sí puede. Sin él, el encuadre de antes (8 m/s, ritmo 1).
+   */
+  private readonly encuadre: { ritmo: number; vCasco: number };
+
+  constructor(lienzo: HTMLCanvasElement, est: EstadoRegata, encuadre: { ritmo: number; vCasco: number } = { ritmo: 1, vCasco: 8 }) {
+    this.encuadre = encuadre;
     this.circuito = est.circuito;
     this.paleta = paletaDe(est.circuito);
     this.trazado = construirTrazado(est.circuito);
@@ -140,16 +151,23 @@ export class Vista {
     const mira = puntoDeMira(this.trazado, nave.metros);
     this.camara.lookAt(new Vector3(mira.x, 0.6, mira.z));
 
-    // [R-503] La velocidad abre el encuadre.
-    const fovQuiere = FOV_PARADO + (FOV_LANZADO - FOV_PARADO) * Math.min(1, nave.velocidad / 8);
+    // [R-503] [K-301] La velocidad EN PANTALLA abre el encuadre, y el turbo más.
+    const { ritmo, vCasco } = this.encuadre;
+    const fovQuiere = fovPara(nave.velocidad * ritmo, vCasco * ritmo, nave.efectos.some((e) => e.tipo === 'turbo'));
     this.fovActual += (fovQuiere - this.fovActual) * Math.min(1, dt * 3);
     this.camara.fov = this.fovActual;
     this.camara.updateProjectionMatrix();
 
-    this.agua.actualizar(this.camara, est.reloj, oleaje);
-    this.mundo.actualizarHuevos(est.huevos, est.reloj, oleaje);
-    this.mundo.actualizarBoyas(est.reloj, oleaje);
-    this.flota.actualizar(est.naves, this.trazado, est.reloj, oleaje, dt);
+    // [K-101] El mar va con el reloj REAL, acumulado aquí con el `dt` de
+    // pantalla: la regata corre a `RITMO`, pero un mar acelerado se ve de
+    // dibujos animados. Barcas, huevos y boyas flotan sobre la misma ola, así
+    // que todos leen este mismo tiempo.
+    this.tiempoMar += dt;
+    const tiempoMar = this.tiempoMar;
+    this.agua.actualizar(this.camara, tiempoMar, oleaje);
+    this.mundo.actualizarHuevos(est.huevos, tiempoMar, oleaje);
+    this.mundo.actualizarBoyas(tiempoMar, oleaje);
+    this.flota.actualizar(est.naves, this.trazado, tiempoMar, oleaje, dt);
 
     this.renderizador.render(this.escena, this.camara);
 
@@ -185,6 +203,7 @@ export class Vista {
       llamadas: info.calls,
       triangulos: info.triangles,
       simplificado: this.simplificado,
+      fov: Math.round(this.fovActual),
     };
   }
 

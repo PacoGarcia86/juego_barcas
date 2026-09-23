@@ -21,7 +21,7 @@ El flujo completo está en [`specs/WORKFLOW.md`](specs/WORKFLOW.md). Órdenes di
 Tres reglas que no se negocian:
 
 1. **Cada requisito tiene un ID estable** (`B-` SPEC-001, `H-` SPEC-002, `A-` SPEC-003,
-   `R-` SPEC-004, `P-` SPEC-005). El código que lo cumple lleva `// [B-xxx]`; el test que lo prueba
+   `R-` SPEC-004, `P-` SPEC-005, `K-` SPEC-006). El código que lo cumple lleva `// [B-xxx]`; el test que lo prueba
    se llama `[B-xxx] …`.
 2. **Un cambio de alcance se escribe en la especificación ANTES que en el código**, nunca después.
 3. **Ninguna afirmación sobre la regata sin medirla.** Si tocas la física, la IA, los objetos o el
@@ -66,6 +66,7 @@ Al escribir cualquier fichero nuevo en `src/engine/` o `src/render/`:
 | `npm run baseline` | **Puerta obligatoria** de todo cambio de regata. Cuatro circuitos, cuatro columnas. |
 | `npm run regata-humo <circuito> <vueltas>` | Una regata con detalle: velocidades, estela, objetos, adelantamientos. |
 | `npm run objetos-audit` | Comprueba que la ruleta reparte lo que la ayuda promete y que ningún objeto se queda en vuelo. |
+| `npm run diversion` | Duración, velocidad de pantalla, huecos sin acontecimiento y pelea por minuto (SPEC-006). `--fase K1`, `--original`. |
 | `npm run icons` | Regenera los iconos de la aplicación instalable. |
 
 `main` despliega a Firebase Hosting en cada push
@@ -77,6 +78,7 @@ y PR.
 ```
 src/engine/
   rng.ts             PRNG con semilla. Única fuente de azar        [B-901]
+  ritmo.ts           Segundos de simulación por segundo real       [K-101]
   tipos.ts           Contratos de datos. Sin lógica
   fisica.ts          Empuje → velocidad. Puro, sin azar            [B-2xx]
   circuito.ts        Tramos, boyas, vueltas, corriente             [B-1xx]

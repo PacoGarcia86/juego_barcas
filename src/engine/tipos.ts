@@ -228,19 +228,45 @@ export interface Nave {
   guardado: TipoObjeto | null;
   efectos: Efecto[];
 
+  /**
+   * [K-203] Segundos de SIMULACIÓN que lleva ciñendo la boya: timón hacia
+   * dentro, ya en el carril interior de una curva. Soltar descarga.
+   */
+  cargaMiniturbo: number;
+  /**
+   * [K-202] Cuenta atrás que quedaba (s de simulación) cuando pidió gas a tope
+   * por primera vez. `null` = todavía no lo ha pedido.
+   */
+  arranque: number | null;
+
   vuelta: number;
   huevosRotos: number;
   /** Segundos de regata al cruzar la meta. `null` si no ha llegado. */
   tiempoMeta: number | null;
 }
 
+/**
+ * [K-303] Algo que le ha pasado al jugador en un tick. `quien` es índice de nave.
+ * `golpe` no dice qué objeto fue: el impacto no lo sabe.
+ */
+export type Aviso =
+  | { tipo: 'teAdelantan'; quien: number }
+  | { tipo: 'adelantas'; quien: number }
+  | { tipo: 'huevo' }
+  | { tipo: 'usas'; objeto: TipoObjeto }
+  | { tipo: 'golpe' }
+  | { tipo: 'ahogo' }
+  | { tipo: 'turbo'; origen: 'salida' | 'cenir' | 'objeto' };
+
 export interface EstadoRegata {
   circuito: Circuito;
   naves: Nave[];
   huevos: Huevo[];
   objetos: ObjetoEnVuelo[];
-  /** Segundos de regata transcurridos. */
+  /** Segundos de regata transcurridos. No corre durante la cuenta atrás [K-202]. */
   reloj: number;
+  /** [K-202] Segundos de simulación de cuenta atrás que quedan. 0 = en carrera. SOLO decrece. */
+  cuentaAtras: number;
   /** [B-702] Adelantamientos sufridos por el jugador, ya consolidados. */
   adelantamientosSufridos: number;
   /**
@@ -255,6 +281,12 @@ export interface EstadoRegata {
    * y entonces pueden volver a adelantar y volver a contar.
    */
   delante: number[];
+  /** [K-303] En espejo de `delante`: rivales ya consolidadas DETRÁS del jugador. */
+  detras: number[];
+  /** [K-303] Candidatas a adelantamiento ganado, con la misma histéresis de `B-702`. */
+  pendientesDetras: { indice: number; desde: number }[];
+  /** [K-303] Lo que le ha pasado al jugador en el ÚLTIMO tick. La costura los acumula. */
+  avisos: Aviso[];
   terminada: boolean;
   proximoObjeto: number;
 }

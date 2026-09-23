@@ -151,7 +151,7 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 |---|---|---|
 | **R-501** | **La cámara mira al punto del trazado 45 m por delante de la barca**, no al eje de la barca (`DR3`). Va 14 m por detrás y 4,5 m por encima | Test de `trazado.ts`: en la curva del tramo 4 de `ria`, el punto de mira está dentro del circuito |
 | **R-502** | El suavizado de la cámara va en **tiempo de regata**, no de reloj: a cámara lenta o acelerada el encuadre es el mismo | — |
-| **R-503** | La velocidad abre el campo de visión: de 62° parado a 76° a 8 m/s | — |
+| **R-503** | La velocidad abre el campo de visión: de 62° parado a 76° a **la velocidad de casco de la barca seguida**, y hasta 82° con turbo (**era «a 8 m/s»**: ninguna barca llegaba y el FOV no pasaba de 72°; lo reescribió SPEC-006 `K-301`) | `[K-301]` sobre `fovPara` |
 | **R-504** | `vista.ts` es el único fichero que toca el `WebGLRenderer` y el lienzo | Test estático |
 
 ### R-6xx · El bucle

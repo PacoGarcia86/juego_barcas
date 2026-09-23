@@ -62,23 +62,29 @@ test('[H-101] romper un huevo es gratis y repetible, vayas donde vayas', () => {
   // sobre varias semillas a propósito: con los 8 s de reaparición del borrador
   // esto pasaba con unas semillas y con otras el jugador rompía UN huevo en
   // toda la regata, según le tocase ir delante o detrás de alguien (`DH5`).
+  // Tres vueltas fijas: la ría pasó a correrse a dos (`K-102`) y lo que se
+  // vigila es el huevo, no la longitud de la regata.
+  const rotosPorSemilla: number[] = [];
   for (const semilla of [1, 2, 3, 4, 5, 6]) {
-    const { est, rng, circuito: c } = montar('ria', { barca: 'trainera', tripulacion: ['timonel'] }, { semilla });
+    const { est, rng, circuito: c } = montar('ria', { barca: 'trainera', tripulacion: ['timonel'] }, { semilla, vueltas: 3 });
     let e = est;
     while (!e.terminada && e.reloj < 1800) {
       const jugador = e.naves.find((n) => n.jugador)!;
       // Suelta lo que lleve para tener las manos libres.
       e = avanzar(e, { mando: mando({ gas: 0.95, usar: jugador.objeto !== null }), ultimaVuelta: jugador.vuelta >= c.vueltas - 1 }, rng);
     }
-    const rotos = e.naves.find((n) => n.jugador)!.huevosRotos;
-    // El umbral es 6 y no 12 porque este piloto **no toca el timón en toda la
-    // regata**: si le toca ir pegado a otra barca en su mismo carril, se come
-    // sus sobras y no se aparta. Los 12 de `HG3` se miden en
-    // `npm run objetos-audit`, con un piloto que sí se cambia de carril. Lo que
-    // este test vigila es que nunca se baje de la ruina de `DH5`, que eran 1 y
-    // 3 huevos en una regata entera.
-    assert.ok(rotos >= 6, `semilla ${semilla}: solo rompió ${rotos} huevos`);
+    rotosPorSemilla.push(e.naves.find((n) => n.jugador)!.huevosRotos);
   }
+  // [HG3] Este piloto **no toca el timón en toda la regata**: si le toca ir
+  // pegado a otra barca en su mismo carril, se come sus sobras y no se aparta.
+  // Pasa en una semilla de cada veinte con cualquier paso de filas (SPEC-002,
+  // «Lo que la medición cambió»), así que el mínimo por semilla medía la
+  // suerte. Lo que este test vigila es la ruina de `DH5` —1 y 3 huevos en la
+  // MITAD de las semillas—: la mediana y que no caiga más de una.
+  const orden = rotosPorSemilla.slice().sort((a, b) => a - b);
+  const mediana = orden[Math.floor(orden.length / 2)]!;
+  assert.ok(mediana >= 12, `mediana de ${mediana} huevos: ${rotosPorSemilla.join(' ')}`);
+  assert.ok(rotosPorSemilla.filter((r) => r < 6).length <= 1, `más de una semilla por debajo de 6: ${rotosPorSemilla.join(' ')}`);
 });
 
 test('[H-103] con un objeto en la mano no se coge otro, y el huevo sigue entero', () => {

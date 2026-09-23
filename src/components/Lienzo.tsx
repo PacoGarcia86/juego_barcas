@@ -10,10 +10,12 @@ interface Props {
   alFotograma: (dt: number) => EstadoRegata;
   inicial: EstadoRegata;
   seguido: number;
+  /** [K-301] Ritmo y velocidad de casco de la barca seguida: la vista no los puede calcular. */
+  encuadre: { ritmo: number; vCasco: number };
   onDiagnostico?: (d: Diagnostico) => void;
 }
 
-export default function Lienzo({ alFotograma, inicial, seguido, onDiagnostico }: Props) {
+export default function Lienzo({ alFotograma, inicial, seguido, encuadre, onDiagnostico }: Props) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   // Las funciones se leen por referencia para que el bucle no se reinicie en
   // cada render de React: un bucle que se reinicia pierde el acumulador y con
@@ -31,7 +33,7 @@ export default function Lienzo({ alFotograma, inicial, seguido, onDiagnostico }:
 
     let vista: Vista;
     try {
-      vista = new Vista(elemento, inicial);
+      vista = new Vista(elemento, inicial, encuadre);
     } catch {
       // Sin WebGL 2 no hay juego en 3D, pero tampoco pantalla en blanco.
       const aviso = document.createElement('p');

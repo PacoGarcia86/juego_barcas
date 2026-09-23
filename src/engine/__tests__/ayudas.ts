@@ -30,9 +30,11 @@ export interface Plantilla {
 export function montar(
   circuitoId: string,
   jugador: Plantilla = { barca: 'chalana', tripulacion: [] },
-  opciones: { semilla?: number; rivales?: Plantilla[]; vueltas?: number } = {},
+  opciones: { semilla?: number; rivales?: Plantilla[]; vueltas?: number; base?: Circuito; cuentaAtras?: number } = {},
 ): { est: EstadoRegata; rng: Rng; circuito: Circuito } {
-  const base = circuito(circuitoId);
+  // `base` deja montar un circuito que no está en el catálogo: el arnés de
+  // `K-001` lo usa para correr los circuitos de antes del recorte.
+  const base = opciones.base ?? circuito(circuitoId);
   const c = opciones.vueltas === undefined ? base : { ...base, vueltas: opciones.vueltas };
   const rng = crearRng(opciones.semilla ?? 1234);
   // Siete rivales: el catálogo tiene seis barcas, así que se recorre en ciclo
@@ -59,7 +61,7 @@ export function montar(
     }),
     inscribir('Tú', jugador, true),
   ];
-  return { est: crearRegata(c, inscritos, rng, huevosDe(c)), rng, circuito: c };
+  return { est: crearRegata(c, inscritos, rng, huevosDe(c), { cuentaAtras: opciones.cuentaAtras }), rng, circuito: c };
 }
 
 export function inscribir(nombre: string, plantilla: Plantilla, jugador: boolean): Inscripcion {

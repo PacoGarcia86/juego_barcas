@@ -44,7 +44,7 @@ ponderación por posición es el mecanismo, y es lo que hay que medir.
 |---|---|---|
 | **HG1** | La ayuda no miente | `npm run objetos-audit` comprueba que los 8 objetos descritos salen de la ruleta y que ninguno sale con probabilidad 0 en ninguna posición |
 | **HG2** | El último tiene opciones y el primero no las regala | Sobre 100 000 tiradas: el `kraken` sale en la 8.ª plaza **más de 12 veces** más a menudo que en la 1.ª, y el `turbo` nunca supera el 30 % en ninguna plaza |
-| **HG3** | Coger huevos es gratis y repetible **vayas donde vayas en la regata** | Con un piloto que se cambia de carril (`npm run objetos-audit`), el jugador rompe **al menos 12** huevos en las 20 regatas del arnés, vaya primero o último. Con un piloto que **no toca el timón**, al menos 6: quedarse pegado a otra barca y comerse sus sobras es una consecuencia de no pilotar, no un fallo del sistema |
+| **HG3** | Coger huevos es gratis y repetible **vayas donde vayas en la regata** | Con un piloto que se cambia de carril (`npm run objetos-audit`), el jugador rompe **al menos 12** huevos en las 20 regatas del arnés, vaya primero o último. Con un piloto que **no toca el timón**, sobre 6 semillas de la ría a 3 vueltas: **mediana ≥ 12 y como mucho una por debajo de 6**. Quedarse pegado a otra barca y comerse sus sobras es una consecuencia de no pilotar, no un fallo del sistema (criterio reescrito por SPEC-006, ver abajo) |
 | **HG4** | Ningún objeto se renueva solo | Sobre 20 regatas simuladas, **treinta segundos después de la bandera** no queda ni un objeto en el agua ni un efecto vivo. No se mide en el tick de meta: un ancla soltada veinte segundos antes todavía tiene cuerda, y exigir cero ahí medía la suerte del piloto, no el invariante |
 
 ### 2.2 No-objetivos
@@ -89,10 +89,10 @@ el `Rng`. El azar de la ruleta vive en `huevos.ts`, que sí recibe `Rng`.
 | ID | Requisito | Aceptación |
 |---|---|---|
 | **H-101** | **Los huevos flotan en el circuito y se rompen pasando por encima. No cuestan nada: ni doblones, ni puntos, ni un recurso del jugador.** Es la regla que define el sistema | `romperHuevo` no recibe ni devuelve doblones, y `economia.ts` no importa `huevos.ts`. Test estático que lo prohíbe |
-| **H-102** | Los huevos van en **filas de 5** repartidas por la vuelta, una fila cada ~180 m, con un huevo por carril hasta 5. Sus metros se calculan del circuito, no se escriben a mano | `huevosDe(circuito)` de una vuelta de 1 200 m devuelve entre 25 y 40 huevos, todos con `metros` dentro de la vuelta |
+| **H-102** | Los huevos van en **filas de 5** repartidas por la vuelta, una fila cada ~110 m (**antes 180**: lo cambió SPEC-006 `K-201` al acortar la regata a 2 vueltas), con un huevo por carril hasta 5. Sus metros se calculan del circuito, no se escriben a mano | `huevosDe(circuito)` de una vuelta de 1 200 m devuelve entre 22 y 55 huevos (11 filas de 2 a 5), todos con `metros` dentro de la vuelta |
 | **H-103** | **Un objeto a la vez.** Romper un huevo con objeto en mano no da nada (y no rompe el huevo). Con vigía a bordo (`A-201`) se puede guardar un segundo | Con objeto en mano, `romperHuevo` devuelve `null` y el huevo sigue entero |
 | **H-104** | **La ruleta pondera por posición.** Ocho objetos con peso por plaza (tabla en `objetos.ts`). El `kraken` y la `niebla` son del que va atrás; el `ancla` y la `ola`, del que va delante | Tabla de pesos declarada; `HG2` medido en `objetos-audit` |
-| **H-105** | El huevo roto reaparece a los **2 s**. Mientras, es invisible y no se puede romper. Lo que impide «minar» un huevo (`DH2`) no es el reloj sino `huevoPisado`, que exige que el huevo caiga dentro del tramo recorrido en el tick: una barca parada no vuelve a cruzarlo | Una barca parada sobre un huevo no saca ningún objeto más. Y sobre 6 semillas de `ria`, el jugador rompe ≥ 12 huevos en las 6 |
+| **H-105** | El huevo roto reaparece a **1 s** de simulación (**eran 2**: lo cambió SPEC-006 en K2, ver abajo). Mientras, es invisible y no se puede romper. Lo que impide «minar» un huevo (`DH2`) no es el reloj sino `huevoPisado`, que exige que el huevo caiga dentro del tramo recorrido en el tick: una barca parada no vuelve a cruzarlo | Una barca parada sobre un huevo no saca ningún objeto más. Y sobre 6 semillas de `ria`, el jugador rompe ≥ 12 huevos en las 6 |
 | **H-106** | La ruleta usa el `Rng` de la regata (`B-901`): misma semilla ⇒ mismos objetos | 200 regatas con la misma semilla dan la misma secuencia de objetos |
 
 ### H-2xx · Los ocho objetos
@@ -179,6 +179,13 @@ Reparto de la ruleta, de la 1.ª a la 8.ª plaza:
 | Niebla | 3,3 % | 11,4 % | 16,1 % |
 | Tres olas | 2,1 % | 6,9 % | 9,9 % |
 | Kraken | 0,3 % | 4,8 % | **20,9 %** |
+
+### Lo que la medición cambió respecto a lo escrito
+
+| Requisito | Lo que decía la especificación | Lo que dijo la medición |
+|---|---|---|
+| `H-105` | Reaparición a los 2 s | **Con el grupo apretado, 2 s vacían el carril del que va detrás.** SPEC-006 K2 metió más pelea (1,80 adelantamientos por minuto) y el grupo va más junto: en `objetos-audit`, `canal/1` bajó a **10 huevos** (umbral de `HG3`, 12) con el jugador toda la regata a 2,5–10 m de otra barca en un canal de 2–3 carriles. A 4 m/s, el hueco mínimo de `B-302` (2,5 m) son 0,6 s: con 2 s de reaparición el de detrás no ve un huevo. Con **1 s**, mínimo **17**; con 0,5 s, 20. Se queda en 1 s: sigue sin poder «minarse» un huevo porque eso lo impide `huevoPisado`, no el reloj |
+| `HG3` (piloto sin timón) | «Al menos 6 huevos» en cada una de las 6 semillas | **El mínimo por semilla mide la suerte, no el huevo.** Medido en 2026-09-23 al pasar `H-102` de 180 m a 110 m (SPEC-006 `K-201`), sobre 20 semillas: con 180 m, **18 18 18 7 18 …** (la semilla 4 ya iba pegada a otra barca); con 110 m, **30 30 30 30 3 29 …** (ahora es la 5). Una de cada veinte se queda 2,5 m detrás de una rival toda la regata con los dos pasos. Lo que `DH5` rompía era el sistema entero —1 y 3 huevos en la mitad de las semillas—, y eso es lo que el criterio nuevo vigila: mediana ≥ 12 y como mucho una semilla por debajo de 6 |
 
 ---
 

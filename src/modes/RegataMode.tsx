@@ -9,11 +9,15 @@ import type { Inscripcion } from '../engine/carrera.ts';
 import { barcaEfectiva } from '../engine/barcas.ts';
 import { BARCAS, barcaPorId } from '../engine/datos/barcas.ts';
 import { MotorDeRegata } from '../juego/motor.ts';
+import { segundosReales } from '../engine/ritmo.ts';
 import type { Diagnostico } from '../render/tresd/vista.ts';
 import Lienzo from '../components/Lienzo.tsx';
 import Tablero from '../components/Tablero.tsx';
 import Aliento from '../components/Aliento.tsx';
 import Mando from '../components/Mando.tsx';
+import Cuenta from '../components/Cuenta.tsx';
+import Avisos from '../components/Avisos.tsx';
+import { velocidadDeCasco } from '../engine/fisica.ts';
 
 interface Props {
   circuito: Circuito;
@@ -96,6 +100,11 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
 
   const jugador = motor.jugador;
   const nave = est.naves[jugador];
+  // [K-301] La vista no puede importar el motor: el encuadre se le da hecho.
+  const encuadre = useMemo(
+    () => ({ ritmo: motor.ritmo, vCasco: velocidadDeCasco(motor.est.naves[motor.jugador]!.barca.eslora) }),
+    [motor],
+  );
   const final = motor.final;
 
   return (
@@ -104,10 +113,14 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
         inicial={motor.est}
         alFotograma={alFotograma}
         seguido={jugador}
+        encuadre={encuadre}
         onDiagnostico={diagnosticoPedido ? setDiag : undefined}
       />
 
       <Tablero est={est} orden={motor.orden} jugador={jugador} />
+      {/* [K-302] [K-303] */}
+      <Cuenta est={est} />
+      {!terminada && <Avisos avisos={motor.avisosRecientes(2)} naves={est.naves} />}
       {nave !== undefined && <Aliento nave={nave} />}
       {!terminada && (
         <Mando valor={mandoVisible} onCambio={cambiarMando} puedeUsar={nave?.objeto != null} />
@@ -122,6 +135,7 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
       {diag !== null && (
         <p className="pointer-events-none absolute bottom-1 left-2 font-mono text-[10px] text-tinta-100">
           {diag.fps} fps · {diag.llamadas} llamadas · {Math.round(diag.triangulos / 1000)} k tri
+          {' · '}{diag.fov}° de campo
           {diag.simplificado ? ' · CALIDAD REDUCIDA' : ''}
         </p>
       )}
@@ -134,8 +148,9 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
               {final.posicion}.º de {est.naves.length}
             </h2>
             <ul className="grid gap-1 text-sm text-tinta-300">
-              <li>Tiempo: {final.tiempo.toFixed(2).replace('.', ',')} s</li>
-              {final.diferencia > 0 && <li>A {final.diferencia.toFixed(2).replace('.', ',')} s del ganador</li>}
+              {/* [K-103] En segundos de pantalla, no de simulación. */}
+              <li>Tiempo: {segundosReales(final.tiempo).toFixed(2).replace('.', ',')} s</li>
+              {final.diferencia > 0 && <li>A {segundosReales(final.diferencia).toFixed(2).replace('.', ',')} s del ganador</li>}
               <li>Huevos rotos: {final.huevos}</li>
               <li className={final.limpia ? 'text-[var(--color-bien)]' : 'text-[var(--color-mal)]'}>
                 {final.limpia

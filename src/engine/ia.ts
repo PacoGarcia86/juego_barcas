@@ -12,9 +12,10 @@
 import type { EstadoRegata, Mando, Nave, Personalidad } from './tipos.ts';
 import type { Rng } from './rng.ts';
 import { barajar } from './rng.ts';
-import { carrilesDisponiblesEn, puntoDe, radioEfectivo } from './circuito.ts';
+import { carrilesDisponiblesEn, haciaDentro, puntoDe, radioEfectivo } from './circuito.ts';
 import { velocidadDeViraje } from './fisica.ts';
 import { liderDe, tieneEfecto } from './objetos.ts';
+import { RITMO } from './ritmo.ts';
 
 const PERSONALIDADES: Personalidad[] = ['lanzada', 'rueda', 'sucia', 'regular'];
 
@@ -45,6 +46,37 @@ export function factorGoma(diferenciaAlLider: number, ultimaVuelta: boolean): nu
   if (diferenciaAlLider < 0) return 1 + 0.06 * (-diferenciaAlLider / 120);
   return 1 - 0.04 * (diferenciaAlLider / 120);
 }
+
+/** [K-202] Cómo sale una barca al acabar la cuenta atrás. */
+export type Salida = 'turbo' | 'ahogo' | 'nada';
+
+/**
+ * [K-204] Proporción de salidas clavadas por personalidad. De las que no la
+ * clavan, la mitad se ahoga y la otra mitad sale sin más.
+ */
+export const CLAVA_LA_SALIDA: Record<Personalidad, number> = {
+  lanzada: 0.8,
+  sucia: 0.6,
+  rueda: 0.45,
+  regular: 0.35,
+};
+
+/** [K-204] La salida de una rival, sorteada con el `rng` de la regata [B-901]. */
+export function salidaDeRival(p: Personalidad, rng: Rng): Salida {
+  if (rng.siguiente() < CLAVA_LA_SALIDA[p]) return 'turbo';
+  return rng.siguiente() < 0.5 ? 'ahogo' : 'nada';
+}
+
+/**
+ * [K-204] ¿Ciñe esta rival? La `lanzada` y la `sucia`, siempre; la `rueda`,
+ * solo cuando saca todo al final; la `regular`, nunca.
+ */
+function cine(p: Personalidad, ultimaVuelta: boolean): boolean {
+  return p === 'lanzada' || p === 'sucia' || (p === 'rueda' && ultimaVuelta);
+}
+
+/** [K-204] Segundos reales de curva que le quedan cuando una rival empieza a ceñir. */
+const CENIR_DESDE = 2;
 
 /** Gas de crucero de cada personalidad, en fracción del empuje disponible. */
 function gasBase(p: Personalidad, energia: number, ultimaVuelta: boolean): number {
@@ -161,6 +193,25 @@ export function decidir(nave: Nave, est: EstadoRegata, ultimaVuelta: boolean): M
     if (mejor !== null) {
       const paso = Math.sign(mejor.carril - nave.carril);
       if (paso !== 0 && carrilLibre(est, nave, nave.carril + paso)) timon = paso;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // [K-204] Ceñir la boya al final de la curva, si va por dentro. Cargar
+  // desde la entrada costaría toda la curva al límite de viraje rebajado; al
+  // final, el miniturbo sale justo a la recta.
+  //
+  // Y SOLO por detrás del jugador: el miniturbo es para cazarle, no para
+  // escaparse. Ciñendo también por delante, las que ciñen se iban, el grupo se
+  // estiraba y los adelantamientos por minuto caían de 1,58 a 1,09 (SPEC-006).
+  // ------------------------------------------------------------------
+  const detras = jugador !== undefined && jugador.metros > nave.metros;
+  if (timon === 0 && nave.tiempoMeta === null && detras && cine(nave.personalidad, ultimaVuelta)) {
+    const aqui = puntoDe(est.circuito, nave.metros);
+    const dentro = haciaDentro(aqui.tramo, carrilesDisponiblesEn(est.circuito, nave.metros));
+    if (dentro !== null && nave.carril === dentro.carril && nave.cambiando === 0) {
+      const quedan = ((1 - aqui.fraccion) * aqui.tramo.longitud) / Math.max(0.5, nave.velocidad);
+      if (quedan <= CENIR_DESDE * RITMO) timon = dentro.sentido;
     }
   }
 

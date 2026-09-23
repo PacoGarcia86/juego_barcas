@@ -10,7 +10,7 @@
 // la semilla. Sin esa rotación, la barca que salía dos veces ganaba el doble y
 // la tabla decía más del reparto de plazas que del catálogo.
 
-import { avanzar, crearRegata, resultadoDe, type Inscripcion } from '../src/engine/carrera.ts';
+import { avanzar, crearRegata, CUENTA_ATRAS, resultadoDe, type Inscripcion } from '../src/engine/carrera.ts';
 import { clasificar } from '../src/engine/clasificacion.ts';
 import { longitudDeVuelta } from '../src/engine/circuito.ts';
 import { BARCAS } from '../src/engine/datos/barcas.ts';
@@ -100,7 +100,8 @@ for (const circuito of CIRCUITOS) {
     for (const b of parrilla) plazas.set(b.id, plazas.get(b.id)! + 1);
 
     const rng = crearRng(semilla * 7919 + circuito.id.length * 13);
-    let est = crearRegata(circuito, inscritos, rng, huevosDe(circuito));
+    // [K-202] Como en el juego: con cuenta atrás.
+    let est = crearRegata(circuito, inscritos, rng, huevosDe(circuito), { cuentaAtras: CUENTA_ATRAS });
     const idDe = new Map<number, string>();
     est.naves.forEach((n, i) => idDe.set(i, parrilla[0] === undefined ? '' : ''));
     // El nombre de la nave es el nombre de la barca: basta para el reparto.

@@ -122,3 +122,13 @@ export function radioEfectivo(tramo: Tramo, carril: number): number {
   const fuera = carriles <= 1 ? 1 : tramo.radio > 0 ? carril / (carriles - 1) : 1 - carril / (carriles - 1);
   return Math.abs(tramo.radio) * (0.88 + 0.24 * fuera);
 }
+
+/**
+ * [K-203] El carril interior de una curva y hacia dónde queda. Con radio
+ * positivo el de dentro es el 0 (el de radio efectivo menor, `radioEfectivo`),
+ * y con radio negativo, el último. Fuera de una curva no hay «dentro».
+ */
+export function haciaDentro(tramo: Tramo, carriles: number): { carril: number; sentido: -1 | 1 } | null {
+  if (tramo.tipo !== 'curva') return null;
+  return tramo.radio > 0 ? { carril: 0, sentido: -1 } : { carril: carriles - 1, sentido: 1 };
+}
