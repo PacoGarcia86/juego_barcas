@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | SPEC-004 |
 | **Título** | El agua se mueve, la barca cabecea sobre ella y la cámara mira por donde va el circuito |
-| **Estado** | ✅ `COMPLETADA` (Fases R1 y R2) |
+| **Estado** | ✅ `COMPLETADA` (Fases R1, R2 y R3) |
 | **Autor** | — |
 | **Creado** | 2026-09-16 |
 | **Módulos afectados** | `src/render/**`, `src/juego/motor.ts`, `src/components/Lienzo.tsx` |
@@ -59,9 +59,8 @@ sobra. **No vuelvas a proponerlo sin traer una medición de tiempo de carga en 4
 - **El render no calcula regata.** Ni posiciones, ni colisiones, ni objetos. Lee `EstadoRegata`.
 - **No hay reflejos de trazado de rayos ni refracción real.** Fresnel aproximado y color por
   profundidad.
-- **No se cargan modelos en marcha.** Un `.glb` es un fichero que bajar, y `1.1` explica por qué
-  eso importa. La lancha se modela en Blender pero llega **como dato TS** dentro del bundle
-  (`R-303`); el resto de mallas son procedurales.
+- **No hay modelos importados.** Todas las mallas son procedurales: un `.glb` es un fichero que
+  bajar, y `1.1` explica por qué eso importa.
 
 ---
 
@@ -76,7 +75,25 @@ sobra. **No vuelvas a proponerlo sin traer una medición de tiempo de carga en 4
 | **DR5** | `trazado.ts` | El render acumulaba su propia distancia recorrida | Boyas y barcas divergían **hasta 11 m** tras 3 vueltas | Las barcas pasaban por dentro de las boyas |
 | **DR6** | `trazado.ts` | El error de cierre se repartía MOVIENDO los puntos | `faro` declara 1 380 m de vuelta y la polilínea medía **1 037 m**: el mundo encogido un 25 %, y desigualmente —22 m del motor eran 9,2 m en un sitio y 28,9 m en otro | La cámara se coloca «22 m por detrás» y acababa **dentro** de la barca del jugador. El test de `R-101` estaba en verde: la polilínea cerraba con menos de metro y medio |
 | **DR7** | `datos/circuitos.ts` | Las curvas de un circuito no sumaban una vuelta | `faro`: giro total **−0,24 rad** de los 6,28 que hacen falta. `ria`: 3,07 | Ningún arreglo de cierre podía salvarlos: no eran circuitos, eran caminos |
-| **DR8** | `flota.ts` | El calado no sabía dónde estaba el suelo de la bañera (Fase R2) | Galeota cargada: flotación a **−0,155** puntales, suelo a **−0,325** | El agua tapaba la bañera: de la lancha solo asomaban la regala y la consola |
+
+**Auditoría visual 2026-09-23** (capturas de los cuatro circuitos a 1280×720, 7 s de regata):
+
+| ID | Fichero | Defecto | Medición | Consecuencia |
+|---|---|---|---|---|
+| **DR8** | `flota.ts` | Los puntos de estela sin usar se mandaban a `y = −9999` y la tira los seguía uniendo con los buenos | Un triángulo blanco de **~150 px** cruzando la esquina inferior en `ria`, desde el primer segundo | Parecía un fallo de la tarjeta gráfica, no espuma |
+| **DR9** | `agua.ts` | La espuma salía de la altura de la ola, sin más | Manchas blancas de **20–40 m** en `tormenta` y `faro`, lisas y con borde de degradado | Se leía como nieve flotando, no como crestas rompiendo |
+| **DR10** | `agua.ts` | El agua no llevaba niebla y el borde de la malla cortaba contra el cielo | Una raya dura en el horizonte en los 4 circuitos; las islas, sí con niebla, salían **más claras que el agua** que tenían delante | El mundo se acababa a 420 m y se notaba |
+| **DR11** | `mundo.ts` | La cámara de sombras era la de serie (±5 m alrededor del origen) y `PCFSoftShadowMap` ya no existe en three 0.186 | **0** barcas con sombra fuera del origen; un aviso en la consola en cada regata | Las sombras costaban un pase de dibujo y no se veían |
+| **DR12** | `mundo.ts` | Islas = dos icosaedros (roca y un capuchón verde) | Siluetas de globo; con la niebla lineal a **219 m** en `faro`, todas del mismo azul claro | No se leía costa, se leían manchas |
+
+**Auditoría visual de las barcas 2026-09-23** (capturas de cerca, a 5–8 m de cada casco, en `ria`):
+
+| ID | Fichero | Defecto | Medición | Consecuencia |
+|---|---|---|---|---|
+| **DR13** | `barca.ts` | El casco era un tubo de 13 secciones con una tapa plana a la altura de la borda | **286 triángulos** por casco; borda recta, sin espejo de popa, sin interior | De cerca se leía como una vaina de guisante con tapa, no como una barca |
+| **DR14** | `barca.ts` | El remero era una caja con un octaedro encima, sentado **sobre la tapa** | **20 triángulos**; sin brazos ni piernas | Se leían como fichas de parchís, no como gente remando |
+| **DR15** | `flota.ts` | El remo giraba sobre su propio eje en vez de barrer, y era corto | La pala quedaba **0,1–0,3 m por encima del agua** en toda la palada; los remos de una chalana se cruzaban | Remos que aletean en el aire: la barca no parecía moverse por ellos |
+| **DR16** | `flota.ts` | La vela iba en el plano de crujía, sin palo ni botavara | **0°** de escota; ningún palo | Un triángulo flotando; la del jugador, de canto e invisible (ver `index.md`) |
 
 ---
 
@@ -88,8 +105,8 @@ src/render/
   tresd/
     trazado.ts       NUEVO  Circuito → eje en el mundo. PURO          [R-1xx]
     agua.ts          NUEVO  Gerstner, espuma, estela                  [R-2xx]
-    barca.ts         NUEVO  Lancha → geometría unitaria, trima        [R-3xx]
-    modelos.ts       R2     La lancha modelada en Blender (dato)     [R-303]
+    barca.ts         NUEVO  Malla procedural de casco y remos         [R-3xx]
+                     (Fase R3: forma, interior, remero y aparejo  [R-308]–[R-311])
     flota.ts         NUEVO  Las 8 barcas en pocas llamadas            [R-302]
     mundo.ts         NUEVO  Cielo, costa, islas, boyas, huevos        [R-4xx]
     vista.ts         NUEVO  Renderizador y cámara. Lo único que toca GL [R-5xx]
@@ -123,17 +140,26 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | **R-203** | La amplitud de las olas la fija `oleajeEn` del circuito (`B-107`), no una constante del render: con `oleaje 0` el agua está casi plana | Con `oleaje 0` la amplitud total < 0,12 m; con `oleaje 1`, > 0,55 m |
 | **R-204** | **Espuma en las crestas** y **estela detrás de cada barca**: una tira de geometría que se alarga con la velocidad y se desvanece en 3 s | Parado, la estela mide < 2 m; a 5 m/s, > 14 m |
 | **R-205** | El color del agua va por profundidad aproximada y Fresnel contra el cielo, no por un color plano | — |
+| **R-206** | **Detalle y reflejo por píxel.** Encima de la malla de Gerstner, el sombreador de fragmentos suma rizos pequeños procedurales (sin textura que descargar) a la normal, refleja **el mismo cielo que se dibuja** (`R-406`) con Fresnel de Schlick y pone el brillo del sol con la dirección de la luz de la paleta, no una constante | Test estático: el sombreador del agua recibe `direccionSol` como uniforme y no declara una dirección de luz propia |
+| **R-207** | **El agua lleva niebla** y funde con el horizonte del cielo (`DR10`): el color de la niebla del agua, la de la escena y el pie del cielo es el mismo de la paleta | Test: la niebla de la escena y el uniforme de niebla del agua salen del mismo campo de la paleta |
+| **R-208** | **La espuma se rompe** (`DR9`): sale de la altura de la cresta **multiplicada por un ruido** que se mueve con el agua, no de un umbral liso de altura | — (se mira en la captura: §6.3) |
+| **R-209** | **La estela no se estira al vacío** (`DR8`): un punto sin rastro se pliega sobre el último punto bueno de su barca; la tira tiene borde suave y ruido de espuma | Test: tras 3 s de regata ningún vértice de la estela está a más de 30 m de su barca ni por debajo de −3 m |
 
 ### R-3xx · Las barcas
 
 | ID | Requisito | Aceptación |
 |---|---|---|
 | **R-301** | **Cada barca se posa sobre el agua**: su altura es `alturaDeOla` en su `(x, z)`, y su cabeceo y balanceo salen de la pendiente de la ola en dos puntos separados por la eslora y la manga (`DR1`) | El cabeceo varía más de 2° en 30 s con `oleaje ≥ 0,4` |
-| **R-302** | **Las 8 barcas van en pocas llamadas de dibujo** (`DR2`): una sola geometría (la lancha, `R-303`), instanciada, con el color por instancia | ≤ **6 llamadas de dibujo** para la flota entera, comprobable en `?diagnostico=1` |
-| **R-303** | **Todas las barcas son una lancha modelada en Blender** (`arte/barcas/`: `modelar.py` → `barcas.blend` → `exportar.py` → `src/render/tresd/modelos.ts`): la lancha de consola de `lancha_low_poly.glb`, de la que se reutilizan motor y timón. **Sin vela ni remos**: una lancha con motor no los lleva. El tipo de casco (`planeador` / `desplazamiento`) sigue mandando en la física (`B-203`), no en la malla. Se exporta como **dato unitario** —1 de eslora, 1 de manga, regala a 0— sin cargar ningún fichero en marcha, y se escalan con la `eslora` y la `manga` de cada barca: una traiñera de 14 m se ve larga y estrecha; una neumática, corta y ancha | La relación eslora/manga del casco pintado coincide con la del dato ± 5 %; la línea de flotación usa la quilla del modelo, no una constante |
-| **R-304** | **La lancha levanta la proa con el empuje pedido**, no con el reloj: a gas 0 va plana, a tope y en marcha encabuza hasta ~4°. (Antes: los remos se movían con el empuje; la lancha no lleva remos) | `trimaDeProa(0, v) = 0`; crece con el gas y con la velocidad; tope 4° |
+| **R-302** | **Las 8 barcas van en pocas llamadas de dibujo** (`DR2`): una geometría por tipo de casco, instanciada, con el color por instancia | ≤ **6 llamadas de dibujo** para la flota entera, comprobable en `?diagnostico=1` |
+| **R-303** | La malla del casco es procedural y sale de la `eslora`, la `manga` y el `casco` de la barca: una traiñera de 14 m se ve larga y estrecha; una neumática, corta y ancha | La relación eslora/manga de la malla coincide con la del dato ± 5 % |
+| **R-304** | Los remos se mueven con la fracción de empuje, no con el reloj: a empuje 0 están quietos | — |
 | **R-305** | El casco se hunde con el desplazamiento: una barca con 5 tripulantes va más metida en el agua | El calado de la malla crece con `masa` |
-| **R-306** | **Cada cara del modelo lleva una pintura**: `casco` y `franja` (con una luz que las oscurece, p. ej. el fondo) toman el color de la barca **por instancia**; el resto (fibra, madera, motor, cristal) es color fijo del modelo. Sin materiales múltiples: las ocho lanchas son UNA `InstancedMesh` (`R-302`) | Ocho barcas con colores distintos se dibujan en la misma `InstancedMesh`; flota ≤ 6 llamadas |
+| **R-306** | **El casco tiene tres zonas de color**: obra viva con el color del casco, una **franja** en la borda con el color `franja` de la barca y la **cubierta de madera**. Sin mallas nuevas: una marca por vértice y el color de franja por instancia | Test: la geometría del casco marca borda y cubierta, y la flota sigue en ≤ 6 llamadas (`R-302`) |
+| **R-307** | **Se ve quién rema**: un remero por bancada con la camiseta del color `franja`, que se inclina con la boga (`R-304`), y remos con **pala**. Todos los remeros de las ocho barcas van en una sola malla instanciada | La flota entera sigue en **≤ 6 llamadas de dibujo** (`R-302`) |
+| **R-308** | **El casco tiene forma de barca** (`DR13`): **arrufo** —la borda sube hacia proa y algo hacia popa—, roda, **espejo de popa**, quilla y, el de desplazamiento, **tingladillo** (tracas solapadas que dan escalón de luz); el planeador, **codillo** vivo entre fondo en V y costado. Y es una barca **abierta**: forro interior, plan, **bancadas** donde se sientan los remeros, regala y cubiertas de proa y popa. Sigue siendo UNA geometría unitaria por tipo de casco (`R-302`) | Test: la borda en proa ≥ 0,15 más alta que en el centro; hay bancadas; ≤ **4 000 triángulos** por casco; la relación eslora/manga sigue en ± 5 % (`R-303`) |
+| **R-309** | **La flotación se ve**: por debajo del calado de cada barca el casco lleva **patente** (pintura de fondo) y encima una **línea de flotación** clara. El calado va por instancia y es el MISMO número que hunde la barca (`R-305`) | Test: el atributo de calado por instancia es el de `caladoDe(masa)` y crece con la masa |
+| **R-310** | **Remeros con cuerpo y remos que reman** (`DR14`, `DR15`): cabeza redonda con gorra, brazos hasta el guion, piernas; sentados en SU bancada y girando con el casco. El remo pivota en el tolete, **barre** a proa y popa, **la pala entra en el agua** en la palada y sale de plano en la recogida. La pala lleva el color de la franja | Test: en la palada, la pala de cada remo llega por debajo de la superficie de la ola |
+| **R-311** | **La vela tiene palo y botavara y va cazada a sotavento** (`DR16`): se abre del plano de crujía según el rumbo contra un viento fijo del circuito, así que **la del jugador se ve desde popa**. Lleva paños y una franja del color de la barca | Test: ninguna vela va a menos de 0,25 rad del plano de crujía |
 
 ### R-4xx · El mundo
 
@@ -144,6 +170,9 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | **R-403** | Los huevos se dibujan flotando y bobean con el agua; un huevo roto (`H-105`) no se dibuja | El número de huevos dibujados coincide con los no rotos del estado |
 | **R-404** | Costa e islas con volumen, colocadas a partir de la semilla del circuito (`B-901`): mismo circuito ⇒ misma costa | Dos construcciones del mismo circuito dan las mismas posiciones |
 | **R-405** | La niebla del objeto `niebla` (`H-206`) empaña la pantalla del jugador mientras dura el efecto, leyéndolo del estado | — |
+| **R-406** | **El cielo es un sombreador**, no una esfera con color por vértice: degradado de la paleta, **disco y halo del sol** en la dirección de la luz, **nubes** procedurales que se mueven y **estrellas** de noche. La función de cielo es una sola y la usa también el reflejo del agua (`R-206`) | Test: el trozo de GLSL del cielo se declara una vez y lo incluyen el cielo y el agua |
+| **R-407** | **Costa con relieve** (`DR12`): cada isla es un montículo con ruido, con **playa, verde y roca** por altura, y **pinos** encima. Sigue saliendo de la semilla del circuito (`R-404`) y en pocas llamadas: una malla instanciada para las islas y otra para los pinos | Dos construcciones del mismo circuito dan las mismas matrices (`R-404`) |
+| **R-408** | Las boyas llevan **franjas** y una **luz** en el tope que se ve de noche; los huevos son **ovoides** y brillan | — |
 
 ### R-5xx · La vista
 
@@ -153,6 +182,8 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | **R-502** | El suavizado de la cámara va en **tiempo de regata**, no de reloj: a cámara lenta o acelerada el encuadre es el mismo | — |
 | **R-503** | La velocidad abre el campo de visión: de 62° parado a 76° a **la velocidad de casco de la barca seguida**, y hasta 82° con turbo (**era «a 8 m/s»**: ninguna barca llegaba y el FOV no pasaba de 72°; lo reescribió SPEC-006 `K-301`) | `[K-301]` sobre `fovPara` |
 | **R-504** | `vista.ts` es el único fichero que toca el `WebGLRenderer` y el lienzo | Test estático |
+| **R-505** | **Post-proceso en HDR**: se dibuja a un objetivo de coma flotante con MSAA, **resplandor** (*bloom*) sobre lo que pasa de 1 —el sol, sus brillos en el agua, los huevos y las luces de las boyas—, viñeta, y el mapeo de tonos y el paso a sRGB **al final, una sola vez**. Por eso los colores de la paleta entran en los sombreadores **en lineal** | Test estático: `vista.ts` monta el compositor y `simplificar` lo apaga (`R-603`) |
+| **R-506** | **Las sombras siguen a la barca seguida** (`DR11`): la cámara de sombras es una caja de ±45 m centrada en ella y la luz se mueve con ella en la dirección del sol | — (se mira en la captura) |
 
 ### R-6xx · El bucle
 
@@ -160,7 +191,7 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 |---|---|---|
 | **R-601** | El motor avanza a **paso fijo de 0,05 s** con acumulador; el render dibuja a la frecuencia del navegador e interpola. Un fotograma lento no cambia la regata (`B-901`) | Test: 100 ticks de 0,05 s dan el mismo estado que un `avanzar` llamado con dt variables que sumen lo mismo |
 | **R-602** | `?diagnostico=1` enseña fps, llamadas de dibujo, vértices y triángulos | — |
-| **R-603** | Si el fotograma medio pasa de 30 ms durante 60 fotogramas, se baja la resolución de la malla del agua y se apaga la espuma. **Se declara en pantalla**, no en silencio | — |
+| **R-603** | Si el fotograma medio pasa de 30 ms durante 60 fotogramas, se baja la resolución de la malla del agua y se apaga la espuma. **Se declara en pantalla**, no en silencio. Desde la Fase R2 también se apagan el resplandor (`R-505`) y las sombras (`R-506`) | — |
 
 ---
 
@@ -180,7 +211,6 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | DR3 | `[R-501]` el punto de mira en la curva está dentro del circuito |
 | DR4 | `[R-202]` la malla del agua no pasa de 90 000 vértices |
 | DR5 | `[R-102]` el trazado cierra y no acumula distancia propia |
-| DR8 | `[R-305]` la flotación nunca pasa por encima del suelo de la bañera |
 
 ### 6.3 Lo que un test no puede ver
 
@@ -195,9 +225,6 @@ todos los tests en verde. Antes de cerrar una fase que toque `render/`, abre el 
 |---|---|---|
 | `R-101` | «El trazado cierra: distancia entre el primer y el último punto < 1,5 m». Y así se implementó: repartiendo el error de cierre entre todos los puntos | **El criterio era insuficiente y estaba en verde con el mundo roto.** Una polilínea puede cerrar perfectamente y medir un 25 % menos de lo que declara, que es justo lo que pasaba en `faro`. Faltaba la otra mitad del contrato: que el PERÍMETRO sea la vuelta (`R-106`). El defecto no se vio en ningún test — se vio en una captura, con la cámara metida dentro de la barca del jugador |
 | `R-101` | Daba por hecho que cualquier lista de tramos se podía cerrar | Un circuito cuyas curvas no suman una vuelta entera no es un circuito. Los cuatro estaban mal: `faro` giraba **−0,24 rad** de los 6,28 necesarios. Se arreglaron los datos y se añadió `R-105` para que no vuelva a colarse |
-| `R-305` | «El calado de la malla crece con `masa`», con `calado = 0,3 + …` pensado para un casco unitario con la quilla en −1 | **La cuenta dependía de la forma del casco y nadie lo decía.** Con la lancha (quilla −0,552) las barcas iban volando; subido a 0,4–0,72, **el agua se dibujaba por encima del suelo de la bañera** (`DR8`): flotación a −0,155 puntales contra suelo a −0,325 en la galeota. Con 153 tests en verde, en la captura solo asomaban la regala y la consola. Se subió el suelo en el modelo, `caladoDe` pasa a 0,21–0,45 y `[R-305]` comprueba la holgura en todo el rango de masas |
-| `R-401` | Se daba por hecho que un modelo exportado podía traer sus colores | El primer `modelos.ts` llevaba los colores fijos en hexadecimal y `[R-401]` lo tumbó. El modelo nombra el material; el color vive en `paleta.ts` (`MATERIALES_DE_BARCA`) |
-| `R-302` | Fase R1: «15 llamadas, 5 de la flota» | La versión de R1, medida de nuevo con el arnés de capturas, dio **16**. La diferencia es lo que haya en pantalla (huevos, objetos), no la flota: sirve de aviso para no comparar llamadas entre capturas distintas |
 
 ---
 
@@ -224,29 +251,95 @@ circuitos abiertos en Chromium, sin un solo error de consola.
 dibuja por software (SwiftShader), no con la tarjeta gráfica. Lo que sí vale de ahí son las
 llamadas de dibujo, los triángulos y —sobre todo— lo que se ve.
 
-### Fase R2 — Barcas modeladas en Blender · ✅ **CERRADA 2026-09-17**
-**Alcance:** `R-302`, `R-303` y `R-304` (reescritos), `R-305` (calado ligado al modelo) y `R-306`
-**Puerta:** `modelos.ts` regenerable desde `arte/barcas/` con Blender en modo `-b`; tests `[R-303]`,
-`[R-304]` y `[R-306]` en verde; flota ≤ 6 llamadas de dibujo en `?diagnostico=1`; las ocho barcas se ven posadas
-sobre el agua —ni flotando por encima ni con la regala hundida— en un navegador de verdad.
-**Resultado:** 153 tests en verde · `tsc --noEmit` limpio · `vite build` correcto · `modelar.py` y
-`exportar.py` corridos con Blender 5.2.1 en `-b` · `El Canal` y `La Ría` abiertos en Chrome, sin
-errores de consola. No toca física, IA, objetos ni circuito: **no aplica `baseline`**.
+### Fase R2 — Que se vea como un juego de 2026 · ✅ **CERRADA 2026-09-23**
+**Alcance:** `R-206` – `R-209`, `R-306`, `R-307`, `R-406` – `R-408`, `R-505`, `R-506`; y `R-603` ampliado
+**Puerta:** los tests de siempre en verde más los nuevos; la flota **sigue en ≤ 6 llamadas**; la malla
+del agua **sigue en ≤ 90 000 vértices**; los cuatro circuitos abiertos en Chromium sin errores ni
+avisos de consola, y **las capturas antes/después miradas** (`§6.3`): ni triángulo de estela, ni
+manchas de espuma, ni raya en el horizonte.
+**Resultado:** 159 tests en verde (10 nuevos en `render-aspecto.test.ts`) · `tsc --noEmit` limpio ·
+`vite build` correcto · los cuatro circuitos abiertos en Chromium sin un error ni un aviso de consola.
 
 | Comprobación | Resultado |
 |---|---|
-| `R-303` · malla exportada | **835 vértices, 1 112 triángulos**, `modelos.ts` de 33 KB |
-| `R-303` · casco pintado, medida unitaria | manga **0,983** · eslora **1,000** (tolerancia ± 0,05) |
-| `R-303` · quilla del modelo | **−0,552 puntales** (antes, constante −1) |
-| `R-304` · trima a gas 0 / tope | **0°** / **4,00°** |
-| `R-305` · calado, barca más ligera → más cargada | **0,212 → 0,450** de la profundidad de quilla |
-| `R-305` · holgura mínima suelo − flotación, 300–3 000 kg | **0,057 puntales** (umbral del test 0,04) |
-| `R-302` · llamadas de dibujo, escena completa | **10 – 11** (antes 16 medidas con el mismo arnés); flota **2** (umbral ≤ 6) |
-| `R-302` · triángulos, escena completa | **70 k** (antes 57 k) |
-| `R-306` · lanchas de colores distintos | las 8 en **una** `InstancedMesh` |
+| `R-302` · mallas de la flota, con remeros | **6** (umbral ≤ 6) |
+| `R-202` · vértices de la malla del agua | **14 081**, sin cambio (tope 90 000) |
+| `R-209` · vértices de estela lejos de su barca tras 3 s | **0** (antes: la mitad de la tira a y = −9999) |
+| `R-209` · largo de la estela a más de 2,5 m/s | **> 14 m** (antes: 0,4 s de estela, unos 2 m) |
+| `R-407` · islas dentro del agua navegable, 4 circuitos | **0** |
+| Llamadas de dibujo, escena completa | **35** (antes 15): el resplandor son ~10 pases a pantalla completa y la sombra, uno más. La flota sigue en 6 |
+| Triángulos por fotograma | **134 k – 156 k** (antes 57 k – 59 k): el pase de sombras y las islas con relieve. Las islas no echan sombra, que costaba 70 k más |
+| Paquete de la aplicación | **233,9 KB** comprimido (antes 225,2): +8,7 KB. Ni una textura ni un modelo que descargar (`§1.2`) |
+| `DR8` – `DR12` en captura | Sin triángulo de estela, sin manchas de espuma, sin raya en el horizonte, sombras en la flota, islas con playa, verde, roca y pinos |
 
-**Lo que se vio en las capturas y ningún test veía:** la bañera inundada (`DR8`). Está en
-«Lo que la medición cambió».
+**Lo que la medición cambió:** la primera espuma nueva (umbral de cresta + ruido) **seguía haciendo
+manchas** en `faro` y `tormenta`: con la cresta alta, el ruido pasaba el umbral en todas partes. Lo
+que funcionó fue lo contrario: que la cresta BAJE el umbral del ruido, y que sin cresta no haya
+espuma. La estela también salió demasiado ancha la primera vez (hasta 1,8 mangas por lado: una
+chalana dejaba una mancha de 7 m); se quedó en 1,1. Y al mirar las capturas salieron dos defectos que
+ningún test veía: **las barcas cabeceaban al revés que la ola** (el giro en X baja la proa y
+`cabeceo` es positivo con la proa arriba) y **los huevos y las boyas se colocaban con el ángulo del
+punto visto desde el origen**, no con el rumbo del circuito: ahora usan `posicionEn`, la misma cuenta
+que las barcas (`R-402`).
+
+---
+
+### Fase R3 — Barcas que se leen como barcas · ✅ **CERRADA 2026-09-23**
+**Alcance:** `R-308` – `R-311`
+**Puerta:** los tests de siempre en verde más los nuevos; la flota **sigue en ≤ 6 llamadas** (`R-302`);
+cada casco en **≤ 4 000 triángulos**; los cuatro circuitos abiertos en Chromium sin errores ni avisos
+de consola, y **las capturas antes/después miradas** (`§6.3`), de cerca y en la vista de juego.
+**Resultado:** 164 tests en verde (5 nuevos en `render-barcas.test.ts`) · `tsc --noEmit` limpio ·
+`vite build` correcto · los cuatro circuitos abiertos en Chromium sin un error ni un aviso de consola.
+
+| Comprobación | Resultado |
+|---|---|
+| `R-302` · mallas de la flota | **6**, sin cambio (umbral ≤ 6) |
+| `R-308` · triángulos por casco | **2 264** desplazamiento · **2 034** planeador (antes 286; tope 4 000) |
+| `R-310` · triángulos por remero | **468** (antes 20) |
+| `R-310` · hondura de la pala | **0,08 – 0,29 m** bajo la ola en la palada; **0,38 – 0,86 m** fuera en la recogida (antes, siempre fuera) |
+| `R-311` · escota | **≥ 0,32 rad** del plano de crujía en todas las barcas, todo el rato |
+| Llamadas de dibujo, escena completa | **35**, sin cambio |
+| Triángulos por fotograma, mismo arnés y mismo instante | **190 k – 212 k** (antes 138 k – 156 k): +55 k, la mitad es el pase de sombras |
+| Paquete de la aplicación | **237,5 KB** comprimido (antes 233,9): +3,6 KB. Ni una textura ni un modelo |
+
+**Lo que la medición cambió:** la primera versión tenía **el mar dentro de la lancha**: con el calado
+de antes (hasta 0,62 del puntal) la línea de flotación de una barca cargada quedaba por encima del
+plan, y en la captura se veía agua entre las bancadas. El calado se quedó en 0,26 – 0,44 (`caladoDe`),
+que sigue creciendo con la masa (`R-305`). Además: **el remo no barría**, giraba sobre su propio eje
+—el giro en X de antes era el de la caña, no el de la palada—, y el espejo de popa salió con las
+caras al revés y se veía el interior por detrás. Con 34 secciones y tres puntos por traca el casco
+llegaba a 3 356 triángulos; con dos puntos por traca (una tabla es plana) y 30 secciones no se nota
+y baja a 2 264.
+
+### Fase «lanchas de Blender» (rama `main`, PR #3) · 🗄️ **RETIRADA 2026-09-23**
+
+Se cerró el 2026-09-17 en `main` mientras R2 y R3 se hacían en otra rama
+(`claude/boat-racing-game-w47dng`), y las dos historias se separaron. Esta fase **sustituía todas
+las barcas por una sola lancha de consola modelada en Blender** (`arte/barcas/`: `modelar.py` →
+`barcas.blend` → `exportar.py` → `src/render/tresd/modelos.ts`, casco a partir de
+`lancha_low_poly.glb` de JuanSimon, CC BY 4.0), sin vela ni remos, con trima de proa según el gas
+y las ocho barcas en una `InstancedMesh`.
+
+**Se retira por decisión del usuario (2026-09-23)**: el juego vuelve a las seis barcas de R2 y R3,
+distintas entre sí, con remeros, remos y vela. Con una sola lancha, las barcas del astillero se
+veían iguales aunque navegasen distinto, y el astillero vende remeros que no se veían a bordo.
+
+**Qué se retira:** `src/render/tresd/modelos.ts`, la `barca.ts` y la `flota.ts` de esa fase y sus
+tests (`[R-303]` lancha unitaria, `[R-304]` trima, `[R-306]` pintura por instancia, `[R-305]`
+holgura de la bañera). **Qué se conserva:** los ficheros fuente de `arte/barcas/` (el modelo, los
+guiones de Blender y `CREDITOS.md`), que ya no se usan en el juego, por si se quiere recuperar la
+lancha.
+
+**Choque de IDs.** Aquella fase reescribió `R-302`–`R-306` y usó `DR8` para «el agua tapaba la
+bañera de la lancha». En este documento esos IDs conservan el significado de R1, R2 y R3 (`DR8` es
+«los puntos de estela sin usar se iban a `y = −9999` y pintaban un triángulo al vacío»). Lo que la fase de Blender midió queda aquí con su nombre propio
+para que un `grep` no los cruce:
+
+| ID | Lo que midió aquella fase |
+|---|---|
+| **DRB1** (era su `DR8`) | Con la quilla de la lancha en −0,552 puntales, la flotación de la galeota cargada quedaba a −0,155 y el suelo de la bañera a −0,325: el agua tapaba la bañera. Con 153 tests en verde, solo se vio en una captura |
+| **DRB2** | Llamadas de dibujo de la escena: **10–11** con la lancha instanciada, contra **16** con el mismo arnés antes de esa fase. La flota, en 2 |
 
 ---
 
@@ -296,4 +389,12 @@ export function alturaDeOla(x: number, z: number, t: number, oleaje: number): nu
 | DR5 · distancia duplicada | `R-102` | R1 | ✅ | `[R-102] el trazado cierra` |
 | DR6 · mundo encogido un 25 % | `R-106` | R1 | ✅ | `[R-106] un metro del motor es un metro del mundo` |
 | DR7 · circuitos que no giran una vuelta | `R-105` | R1 | ✅ | `[R-105] un circuito cerrado gira una vuelta entera` |
-| DR8 · bañera inundada | `R-305` | R2 | ✅ | `[R-305] la flotación nunca pasa por encima del suelo de la bañera` |
+| DR8 · triángulo de estela al vacío | `R-209` | R2 | ✅ | `[R-209] la estela no se estira al vacío` |
+| DR9 · espuma en manchas | `R-208` | R2 | ✅ | captura (§6.3) |
+| DR10 · raya en el horizonte | `R-207` | R2 | ✅ | `[R-207] el agua, la escena y el cielo comparten niebla` |
+| DR11 · sombras en el origen | `R-506` | R2 | ✅ | captura (§6.3) |
+| DR12 · islas de globo | `R-407` | R2 | ✅ | `[R-404] mismo circuito, misma costa` |
+| DR13 · casco de vaina con tapa | `R-308` | R3 | ✅ | `[R-308] el casco tiene arrufo, bancadas y tope de triángulos` |
+| DR14 · remeros de parchís | `R-310` | R3 | ✅ | captura (§6.3) |
+| DR15 · remos que no tocan el agua | `R-310` | R3 | ✅ | `[R-310] la pala entra en el agua en la palada` |
+| DR16 · vela de canto sin palo | `R-311` | R3 | ✅ | `[R-311] la vela va cazada, fuera de crujía` |
