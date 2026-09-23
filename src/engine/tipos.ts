@@ -228,6 +228,17 @@ export interface Nave {
   guardado: TipoObjeto | null;
   efectos: Efecto[];
 
+  /**
+   * [K-203] Segundos de SIMULACIÓN que lleva ciñendo la boya: timón hacia
+   * dentro, ya en el carril interior de una curva. Soltar descarga.
+   */
+  cargaMiniturbo: number;
+  /**
+   * [K-202] Cuenta atrás que quedaba (s de simulación) cuando pidió gas a tope
+   * por primera vez. `null` = todavía no lo ha pedido.
+   */
+  arranque: number | null;
+
   vuelta: number;
   huevosRotos: number;
   /** Segundos de regata al cruzar la meta. `null` si no ha llegado. */
@@ -239,8 +250,10 @@ export interface EstadoRegata {
   naves: Nave[];
   huevos: Huevo[];
   objetos: ObjetoEnVuelo[];
-  /** Segundos de regata transcurridos. */
+  /** Segundos de regata transcurridos. No corre durante la cuenta atrás [K-202]. */
   reloj: number;
+  /** [K-202] Segundos de simulación de cuenta atrás que quedan. 0 = en carrera. SOLO decrece. */
+  cuentaAtras: number;
   /** [B-702] Adelantamientos sufridos por el jugador, ya consolidados. */
   adelantamientosSufridos: number;
   /**

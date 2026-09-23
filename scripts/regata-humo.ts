@@ -4,7 +4,7 @@
 //
 // Es el arnés de una sola regata. El de la puerta de fase es `baseline.ts`.
 
-import { avanzar, PASO, resultadoDe, type ContextoConTraza } from '../src/engine/carrera.ts';
+import { avanzar, CUENTA_ATRAS, PASO, resultadoDe, type ContextoConTraza } from '../src/engine/carrera.ts';
 import { clasificar, formatearTiempo } from '../src/engine/clasificacion.ts';
 import { doblonesDe } from '../src/engine/economia.ts';
 import { longitudDeVuelta } from '../src/engine/circuito.ts';
@@ -16,7 +16,7 @@ const vueltas = vueltasTxt === undefined ? undefined : Number(vueltasTxt);
 const semilla = semillaTxt === undefined ? 7 : Number(semillaTxt);
 
 const jugador: Plantilla = { barca: barcaId, tripulacion: [] };
-const { est: inicial, rng, circuito } = montar(circuitoId, jugador, { semilla, vueltas });
+const { est: inicial, rng, circuito } = montar(circuitoId, jugador, { semilla, vueltas, cuentaAtras: CUENTA_ATRAS });
 
 let est = inicial;
 const vuelta = longitudDeVuelta(circuito);

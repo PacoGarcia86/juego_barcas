@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PASO } from '../carrera.ts';
+import { CUENTA_ATRAS, PASO } from '../carrera.ts';
 import { longitudDeVuelta } from '../circuito.ts';
 import { CIRCUITOS } from '../datos/circuitos.ts';
 import { huevosDe, PASO_ENTRE_FILAS } from '../huevos.ts';
@@ -37,18 +37,22 @@ test('[K-101] el ritmo no cambia la regata: solo cuántos pasos caben en un foto
   const lento = new MotorDeRegata(c, inscritos(), 77, 1);
   const rapido = new MotorDeRegata(c, inscritos(), 77, 3);
   const m = mando({ gas: 0.9 });
-  // 60 s de simulación: 1 200 fotogramas a ritmo 1, 400 a ritmo 3.
+  // 60 s de simulación: 1 200 fotogramas a ritmo 1, 400 a ritmo 3. Los
+  // primeros son de cuenta atrás [K-202], en la que el reloj no corre.
   for (let i = 0; i < 1200; i++) lento.tictac(PASO, m);
   for (let i = 0; i < 400; i++) rapido.tictac(PASO, m);
-  assert.ok(Math.abs(lento.est.reloj - 60) < 1e-6, `reloj ${lento.est.reloj}`);
+  const enCarrera = 60 - CUENTA_ATRAS * RITMO;
+  assert.ok(Math.abs(lento.est.reloj - enCarrera) < 1e-6, `reloj ${lento.est.reloj}, se esperaba ${enCarrera}`);
   assert.deepEqual(rapido.est, lento.est);
 });
 
 test('[K-101] un fotograma a ritmo 3 avanza el triple de simulación', () => {
   const c = { ...circuito('canal'), vueltas: 1 };
   const motor = new MotorDeRegata(c, [inscribir('Tú', { barca: 'chalana', tripulacion: [] }, true)], 5, 3);
+  const antes = motor.est.cuentaAtras;
   motor.tictac(0.1, mando());
-  assert.ok(Math.abs(motor.est.reloj - 0.3) < 1e-9, `reloj ${motor.est.reloj}`);
+  // El juego empieza en cuenta atrás [K-202]: lo que corre es ella.
+  assert.ok(Math.abs(antes - motor.est.cuentaAtras - 0.3) < 1e-9, `cuenta atrás ${antes} → ${motor.est.cuentaAtras}`);
 });
 
 test('[K-102] se recortan las vueltas, no la geometría', () => {

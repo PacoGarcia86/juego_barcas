@@ -5,7 +5,7 @@
 // que es lo que hace que `B-901` —misma semilla, misma regata— siga siendo
 // cierto en un móvil que se atasca.
 
-import { avanzar, crearRegata, PASO, resultadoDe, type Inscripcion } from '../engine/carrera.ts';
+import { avanzar, crearRegata, CUENTA_ATRAS, PASO, resultadoDe, type Inscripcion } from '../engine/carrera.ts';
 import { clasificar } from '../engine/clasificacion.ts';
 import { doblonesDe } from '../engine/economia.ts';
 import { huevosDe } from '../engine/huevos.ts';
@@ -34,7 +34,8 @@ export class MotorDeRegata {
   constructor(circuito: Circuito, inscritos: Inscripcion[], semilla: number, ritmo: number = RITMO) {
     this.ritmo = ritmo;
     this.rng = crearRng(semilla);
-    this.estado = crearRegata(circuito, inscritos, this.rng, huevosDe(circuito));
+    // [K-202] En el juego se sale siempre con cuenta atrás.
+    this.estado = crearRegata(circuito, inscritos, this.rng, huevosDe(circuito), { cuentaAtras: CUENTA_ATRAS });
   }
 
   get est(): EstadoRegata {

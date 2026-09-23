@@ -65,7 +65,7 @@ arnés de `K-001` con el piloto medio de `scripts/piloto.ts` sobre las 32 regata
 |---|---|---|
 | **KG1** | Una regata dura lo que una de kart | Duración de la regata del jugador: **mediana entre 2,5 y 4 min**, ningún circuito con mediana por encima de 5 min |
 | **KG2** | Se va el doble de rápido en pantalla | Velocidad media de la flota, en metros de mundo por segundo real, **≥ 8 m/s** en los cuatro circuitos |
-| **KG3** | Pasa algo cada pocos segundos | Hueco máximo sin acontecimiento para el jugador (huevo roto, objeto usado o recibido, turbo, cambio de posición consolidado): **mediana ≤ 12 s, peor ≤ 20 s** |
+| **KG3** | Pasa algo cada pocos segundos | Hueco máximo sin acontecimiento para el jugador (huevo roto, objeto usado o recibido, turbo, cambio de posición consolidado): **mediana ≤ 12 s, percentil 90 ≤ 20 s** (era «peor ≤ 20 s»: ver «Lo que la medición cambió») |
 | **KG4** | Hay pelea todo el rato | Adelantamientos consolidados con la histéresis de `B-702` —**ganados más sufridos**— **≥ 1,5 por minuto** de mediana |
 | **KG5** | La habilidad se nota | Un piloto experto que usa la salida (`K-202`) y el miniturbo (`K-203`) gana al piloto medio con la misma barca por **entre 3 % y 10 %** del tiempo total en los cuatro circuitos |
 | **KG6** | El astillero sigue teniendo sentido | La puerta del baseline sigue en verde: victoria más alta **< 45 %**, media de adelantamientos sufridos por regata en **`[3, 12]`** (`B-704`), peor 2.º **< 25 %** del tiempo del ganador |
@@ -156,9 +156,9 @@ sabe que existe un segundo real (`B-902`, `B-903`).
 | ID | Requisito | Aceptación |
 |---|---|---|
 | **K-201** | **Reescribe `H-102`** (SPEC-002, editado en la fase K1): una fila de huevos cada **~110 m** en vez de cada 180. A la velocidad media del baseline (4,1–4,75 m/s) y `RITMO` 3, es una fila cada **7,7–8,9 s reales**. La fila sigue saliendo del circuito, no de una lista a mano, y sigue sin costar nada (`H-101`). **Se adelanta a K1**: con 2 vueltas (`K-102`) la regata trae menos filas y `HG3` (≥ 12 huevos por regata, puerta de `objetos-audit` en CI) caía a 10 | Test `[K-201]`: para cada circuito, `longitudDeVuelta / filas` cae en `[100, 120]` m y, dividido por 4,4 m/s y por `RITMO`, en `[7, 10]` s reales. `npm run objetos-audit` en verde. `npm run diversion`: KG3 (en K2) |
-| **K-202** | **Salida con cuenta atrás.** La regata empieza con 3 s de cuenta atrás en los que nadie avanza. Pedir gas a tope en los últimos 0,5 s da un turbo de salida (`H-201`, 1,5 s); pedirlo antes de eso, un ahogo de 1 s a media fuerza. Lo decide el motor a partir del mando, con el reloj de la regata | Tests `[K-202]`: gas a tope en `t = −0,3 s` ⇒ la nave sale con efecto `turbo`; en `t = −1,5 s` ⇒ con efecto `frenado`; sin tocar ⇒ sin efecto. Misma semilla ⇒ mismo resultado (`B-901`) |
-| **K-203** | **Ceñir la boya con miniturbo.** En un tramo `curva`, mantener el timón hacia el interior estando ya en el carril interior carga un medidor (hoy ese gesto no hace nada). Soltarlo con ≥ 0,8 s de carga da un turbo corto (0,6 s); con ≥ 1,6 s, uno largo (1,2 s). Mientras carga, la barca paga la penalización de viraje de `velocidadDeViraje` como si fuera 10 % más rápido: arriesgar cuesta | Tests `[K-203]`: carga de 1,0 s ⇒ turbo de 0,6 s; de 2,0 s ⇒ de 1,2 s; de 0,5 s ⇒ nada; fuera de curva o fuera del carril interior ⇒ el medidor no sube. KG5 con el piloto experto |
-| **K-204** | Las rivales también salen con turbo y ciñen, con probabilidad según su personalidad (`B-501`): la `lanzada` casi siempre, la `regular` a veces. Sin eso, el miniturbo es una ventaja que solo tiene el jugador y KG4 baja | `npm run baseline` en verde (KG6). Test `[K-204]`: sobre 20 salidas con semilla fija, cada personalidad clava la salida en la proporción declarada ± 15 puntos |
+| **K-202** | **Salida con cuenta atrás.** `crearRegata` acepta `cuentaAtras` (el juego y los arneses la piden; los tests que no, empiezan lanzados como hoy). Durante la cuenta atrás nadie avanza y el `reloj` de la regata no corre. Cuenta, ventana y ahogo son gestos del jugador y van en **segundos reales** (`K-103`): el motor los multiplica por `RITMO`. Lo que cuenta es la **primera vez** que se pide gas a tope (≥ 0,9): en los últimos **0,5 s** da un turbo de salida (×6 durante 1,5 s reales, el factor de `K-203`); antes, un ahogo (`frenado` ×0,5 durante 1 s real); sin pedirlo, nada | Tests `[K-202]`: gas a tope a −0,3 s ⇒ la nave sale con efecto `turbo`; a −1,5 s ⇒ con `frenado`; sin tocar ⇒ sin efecto. El reloj sigue en 0 hasta que acaba la cuenta. Misma semilla ⇒ mismo resultado (`B-901`) |
+| **K-203** | **Ceñir la boya con miniturbo.** En un tramo `curva`, mantener el timón hacia el interior estando ya en el carril interior (el de radio efectivo menor, `B-306`) carga un medidor; hoy ese gesto no hace nada. **Soltar el timón o salir de la curva** descarga el medidor: con ≥ 0,8 s reales de carga da un turbo corto (**1,2 s reales**); con ≥ 1,6 s, uno largo (**2,4 s**). El miniturbo empuja **×6**, no ×1,65 como la racha de `H-201`: con ×1,65 el muro de la resistencia de ola (`B-202`) se lo comía y el piloto experto ganaba un 0,8–2,3 % (ver «Lo que la medición cambió»). Salir de la curva cuenta como soltar porque un turbo dentro de la curva no sirve de nada: `B-209` recorta la velocidad a la de viraje. Mientras carga, el límite de viraje de `B-209` baja un 10 %: arriesgar cuesta | Tests `[K-203]`: carga de 1,0 s ⇒ turbo de 1,2 s; de 2,0 s ⇒ de 2,4 s; de 0,5 s ⇒ nada; fuera de curva o fuera del carril interior ⇒ el medidor no sube; salir de la curva con carga ⇒ turbo. KG5 con el piloto experto |
+| **K-204** | Las rivales también salen con turbo y ciñen, según su personalidad (`B-501`). **Salida**, sorteada con el `rng` de la regata al acabar la cuenta: clavan la salida `lanzada` 80 %, `sucia` 60 %, `rueda` 45 %, `regular` 35 %; de las que no la clavan, la mitad se ahoga. **Ceñida**: `lanzada` y `sucia` ciñen cada curva en la que van por el carril interior, `rueda` solo en la última vuelta, `regular` nunca, y **ninguna ciñe si va por delante del jugador**: el miniturbo es para cazarle (`B-503`), no para escaparse. Ciñendo también por delante, el grupo se estiraba y KG4 caía a 1,09. Empiezan a cargar cuando lo que les queda de curva son 2 s reales o menos. Sin esto, el miniturbo es una ventaja que solo tiene el jugador y KG4 baja | `npm run baseline` en verde (KG6). Test `[K-204]`: sobre 40 salidas con semillas fijas, cada personalidad clava la salida en la proporción declarada ± 15 puntos. Test: una `lanzada` detrás del jugador, en el carril interior y a menos de 2 s del final de la curva, pide timón hacia dentro; una `regular`, no; la misma `lanzada` por delante del jugador, tampoco |
 
 ### K-3xx · Que se note
 
@@ -231,7 +231,11 @@ tests y build limpios.
 | `K-201` · paso real entre filas | **101–106 m** (ceil de vuelta/110) |
 
 ### Fase K2 — Acción
-**Alcance:** `K-202`, `K-203`, `K-204`
+**Alcance:** `K-202`, `K-203`, `K-204`, y `H-105` de SPEC-002 (reaparición a 1 s: lo pidió la
+medición, ver «Lo que la medición cambió»). El piloto medio del arnés (`scripts/piloto.ts`) aprende a
+salir: pisa el gas en un momento sorteado del último segundo y pico, así que a veces clava la
+salida y a veces se ahoga. Sin eso se ahogaría en todas, porque hoy pide gas desde el primer tick.
+El piloto experto de KG5 clava la salida y ciñe cada curva en la que puede.
 **Puerta:** **KG3**, **KG4** y **KG5** en `npm run diversion`; **KG6** en `npm run baseline`;
 `npm run objetos-audit` en verde.
 
@@ -274,6 +278,10 @@ Se escribe según se mide, no al cerrar: el texto de `K-101` y `K-102` ya remite
 | `KQ2` | Resuelta: «tres vueltas cortas» | **No se puede cumplir sin romper el astillero.** Con la geometría intacta y 3 vueltas, KG1 pide `RITMO` 4 y aun así da **4,3 min** de mediana (falla) a 60 km/h de pantalla. Con **2 vueltas y `RITMO` 3**: 3,7 min, 12–13 m/s de pantalla, victoria más alta 21 %. Se corren 2 vueltas |
 | `K-101` | `RITMO` inicial 2,0 | **3.** Con 2 vueltas de la geometría original, `RITMO` 2 deja la regata en 5,6 min de mediana (aritmética, no estimación: la regata es idéntica a cualquier ritmo, `K-101`, así que son los 3,7 min × 3/2) |
 | `K-201` | Fase K2 | **Se adelanta a K1.** Con 2 vueltas, `HG3` (≥ 12 huevos por regata, puerta de CI) caía a **10**. Con filas cada 110 m: **13** en `objetos-audit`, y el hueco sin acontecimiento baja de 47 s a **10 s** de mediana, con lo que KG3 ya se cumple en K1 |
+| `K-203` | Miniturbo con el factor de la racha (×1,65), 0,6 / 1,2 s | **El muro de ola se come el turbo.** El experto ganaba al medio un **0,8–2,3 %** (umbral 3–10 %). Decompuesto: la salida aporta 0,1–1,7 % y la ceñida 0,6–1,7 %. Doblar la duración: 1,0–3,8 %. Un empujón de velocidad al soltar (×1,1 y ×1,2): nada, la resistencia de ola lo drena en dos segundos. Barrido del factor (8 semillas × 4 circuitos): ×2,5 → 1,0–3,7 %; ×4 → 1,9–4,5 %; ×4 con duración doble → 2,6–6,3 %; **×6 con duración doble → 3,8–8,5 %**; ×6 con triple → 4,6–12,7 % (se pasa). Con K2 entero (rivales cazando y reaparición a 1 s), ×6 con duración doble queda en **3,1–8,2 %**: faro, 3,1 %, es el margen más justo. Faro y tormenta, con dos curvas por vuelta, son siempre los que menos premian la ceñida. **Decisión del usuario (2026-09-23): turbo mucho más fuerte antes que rebajar KG5** |
+| `K-204` | `lanzada` y `sucia` ciñen todas sus curvas | Con el miniturbo ×6, las que ciñen se escapan: la mediana del 2.º pasa de 0,7 a **4,2 s** y KG4 cae a **1,09**. Que ciñan todas: **1,08**. Que no ciña ninguna: **1,58**. **Que ciñan solo por detrás del jugador: 1,80**, con el 2.º a 1,28 s y la victoria más alta en el 21 % |
+| `H-105` | No se tocaba | Se toca: con el grupo más apretado de K2, `HG3` cayó a **10 huevos** en `canal/1`. La reaparición pasa de 2 s a **1 s** de simulación (SPEC-002, «Lo que la medición cambió»): mínimo **17** |
+| `KG3` | «Peor ≤ 20 s» sobre las 32 regatas | **El máximo mide el sorteo.** Durante el ajuste de K2, 31 regatas quedaban en 8–21 s y una, `ria/3`, daba **27 s**: el piloto medio lleva un kraken en la mano al final de la regata, sin nadie a 55 m, así que ni lo suelta ni puede coger huevo (`H-103`). Es la lección de `B-704` y de `HG3` otra vez: se exige el **percentil 90**. Con K2 entero (incluida la reaparición de `H-105` a 1 s): mediana **10 s**, percentil 90 **11 s**, máximo **25 s** |
 | `DK5` | 0,44 adelantamientos sufridos por minuto | Es la cifra del baseline (parrilla rotada). Con el muestreo de `K-001` (chalana sin tripulación) son **0,08 sufridos + 0,21 ganados = 0,29 por minuto**. KG4 se mide con este último |
 
 ---
@@ -287,8 +295,10 @@ export const RITMO = 2;
 // src/engine/tipos.ts
 export interface Nave {
   // …
-  /** [K-203] Segundos de carga del miniturbo. 0–1,6. */
+  /** [K-203] Segundos de SIMULACIÓN de carga del miniturbo. */
   cargaMiniturbo: number;
+  /** [K-202] Cuenta atrás que quedaba cuando pidió gas a tope por primera vez. `null` = no lo ha pedido. */
+  arranque: number | null;
 }
 export interface EstadoRegata {
   // …

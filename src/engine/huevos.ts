@@ -36,8 +36,8 @@ const POR_FILA = 6;
 /**
  * [H-105] Segundos que tarda un huevo roto en volver.
  *
- * Son DOS, no los ocho del borrador. Los ocho venían de `DH2` —«una barca
- * parada sobre un huevo sacaba 19 objetos en 10 s»—, pero ese defecto no lo
+ * Es UNO. Eran dos, y antes los ocho del borrador. Los ocho venían de `DH2`
+ * —«una barca parada sobre un huevo sacaba 19 objetos en 10 s»—, pero ese defecto no lo
  * arregla el reloj: lo arregla `huevoPisado`, que mira si el huevo cae DENTRO
  * del tramo recorrido en el tick. Una barca que no avanza no vuelve a cruzarlo,
  * y una que avanza lo cruza una vez por vuelta.
@@ -49,8 +49,12 @@ const POR_FILA = 6;
  * detrás de alguien. Con dos segundos —nueve metros— son **17, 18, 17, 18, 17 y
  * 18**. La ruleta de `H-104` le da los mejores objetos al que va último; de
  * poco sirve si el que va último no llega a coger ninguno.
+ *
+ * Y con el grupo apretado de SPEC-006 (`K-204`), dos segundos volvieron a
+ * vaciar el carril del que va detrás: a 4 m/s, los 2,5 m del hueco mínimo
+ * (`B-302`) son 0,6 s, y en `canal/1` el jugador rompió 10 huevos. Con uno, 17.
  */
-export const REAPARICION = 2;
+export const REAPARICION = 1;
 
 /**
  * [H-102] Los huevos salen del circuito, no de una lista escrita a mano: si

@@ -9,12 +9,13 @@
 // REALES de pantalla. Sale con código ≠ 0 si algún objetivo exigido se incumple.
 
 import { montar } from '../src/engine/__tests__/ayudas.ts';
+import { CUENTA_ATRAS } from '../src/engine/carrera.ts';
 import { CIRCUITOS } from '../src/engine/datos/circuitos.ts';
 import { RITMO } from '../src/engine/ritmo.ts';
 import type { Circuito } from '../src/engine/tipos.ts';
 import { CIRCUITOS_ORIGINALES } from './circuitos-originales.ts';
 import { medirRegata, type Medida } from './medida-diversion.ts';
-import { pilotoMedio } from './piloto.ts';
+import { pilotoExperto, pilotoMedio } from './piloto.ts';
 
 const args = process.argv.slice(2);
 const original = args.includes('--original');
@@ -24,15 +25,17 @@ const fase = iFase >= 0 ? args[iFase + 1] : undefined;
 /** Objetivos de SPEC-006 §2.1 por fase. Cambiarlos es cambiar la especificación. */
 const OBJETIVOS_DE_FASE: Record<string, string[]> = {
   K1: ['KG1', 'KG2'],
-  K2: ['KG1', 'KG2', 'KG3', 'KG4'],
+  K2: ['KG1', 'KG2', 'KG3', 'KG4', 'KG5'],
 };
-/** KG5 necesita al piloto experto de K2; hasta entonces no se puede medir. */
 const exigidos = new Set(fase === undefined ? OBJETIVOS_DE_FASE.K2 : (OBJETIVOS_DE_FASE[fase] ?? []));
 const UMBRALES = {
   KG1: { mediana: [2.5, 4] as const, peorCircuito: 5 },
   KG2: 8,
-  KG3: { mediana: 12, peor: 20 },
+  /** El peor caso es el percentil 90: el máximo de 32 regatas mide el sorteo (SPEC-006). */
+  KG3: { mediana: 12, p90: 20 },
   KG4: 1.5,
+  /** Ventaja del experto sobre el medio, en fracción del tiempo del medio. */
+  KG5: [0.03, 0.1] as const,
 };
 
 const circuitos: Circuito[] = original ? CIRCUITOS_ORIGINALES : CIRCUITOS;
@@ -45,20 +48,32 @@ const mediana = (xs: number[]): number => {
 };
 const f = (x: number, d = 2): string => x.toFixed(d).replace('.', ',');
 
+// [K-202] Como en el juego: con cuenta atrás. La foto de antes no la tenía.
+const cuentaAtras = original ? 0 : CUENTA_ATRAS;
 const todas: Medida[] = [];
 const porCircuito = new Map<string, Medida[]>();
+/** [KG5] Por circuito: (tiempo del medio − tiempo del experto) / tiempo del medio. */
+const ventajas = new Map<string, number[]>();
 for (const c of circuitos) {
   const medidas: Medida[] = [];
+  const v: number[] = [];
   for (const semilla of SEMILLAS) {
-    const { est, rng } = montar(c.id, { barca: 'chalana', tripulacion: [] }, { semilla, base: c });
-    medidas.push(medirRegata(est, rng, pilotoMedio, ritmo));
+    const { est, rng } = montar(c.id, { barca: 'chalana', tripulacion: [] }, { semilla, base: c, cuentaAtras });
+    const medio = medirRegata(est, rng, pilotoMedio, ritmo);
+    medidas.push(medio);
+    if (!original) {
+      const otra = montar(c.id, { barca: 'chalana', tripulacion: [] }, { semilla, base: c, cuentaAtras });
+      const experto = medirRegata(otra.est, otra.rng, pilotoExperto, ritmo);
+      v.push((medio.tiempo - experto.tiempo) / medio.tiempo);
+    }
   }
   porCircuito.set(c.id, medidas);
+  ventajas.set(c.id, v);
   todas.push(...medidas);
 }
 
 console.log(`\n  ${original ? 'ORIGINAL · RITMO 1 · circuitos de antes de K-102' : `RITMO ${ritmo}`}\n`);
-console.log('  circuito    vueltas×m    duración   flota     hueco máx   ganados/min  sufridos/min  objetos/min');
+console.log('  circuito    vueltas×m    duración   flota     hueco máx   ganados/min  sufridos/min  objetos/min  experto');
 for (const c of circuitos) {
   const ms = porCircuito.get(c.id)!;
   const vuelta = c.tramos.reduce((a, t) => a + t.longitud, 0);
@@ -66,7 +81,8 @@ for (const c of circuitos) {
     `  ${c.id.padEnd(10)} ${`${c.vueltas}×${vuelta}`.padStart(9)}   ${f(mediana(ms.map((m) => m.minutos)), 1).padStart(5)} min` +
       `  ${f(mediana(ms.map((m) => m.velocidadFlota))).padStart(5)} m/s  ${f(mediana(ms.map((m) => m.huecoMaximo)), 0).padStart(5)} s` +
       `   ${f(mediana(ms.map((m) => m.ganadosPorMinuto))).padStart(8)}   ${f(mediana(ms.map((m) => m.sufridosPorMinuto))).padStart(10)}` +
-      `   ${f(mediana(ms.map((m) => m.objetosPorMinuto))).padStart(9)}`,
+      `   ${f(mediana(ms.map((m) => m.objetosPorMinuto))).padStart(9)}` +
+      `  ${original ? '   —' : `${f(100 * mediana(ventajas.get(c.id)!), 1).padStart(5)} %`}`,
   );
 }
 
@@ -74,25 +90,36 @@ const durMed = mediana(todas.map((m) => m.minutos));
 const peorCircuito = Math.max(...circuitos.map((c) => mediana(porCircuito.get(c.id)!.map((m) => m.minutos))));
 const flotaPeor = Math.min(...circuitos.map((c) => mediana(porCircuito.get(c.id)!.map((m) => m.velocidadFlota))));
 const huecoMed = mediana(todas.map((m) => m.huecoMaximo));
-const huecoPeor = Math.max(...todas.map((m) => m.huecoMaximo));
+const huecos = todas.map((m) => m.huecoMaximo).sort((a, b) => a - b);
+const huecoP90 = huecos[Math.floor(0.9 * (huecos.length - 1))]!;
+const huecoPeor = huecos[huecos.length - 1]!;
 const pelea = mediana(todas.map((m) => m.ganadosPorMinuto + m.sufridosPorMinuto));
 const objetos = mediana(todas.map((m) => m.objetosPorMinuto));
 
 const marca = (id: string): string => (exigidos.has(id) ? '' : '   (no se exige en esta fase)');
 console.log(`\n  KG1 duración            mediana ${f(durMed, 1)} min, peor circuito ${f(peorCircuito, 1)} min   (umbral ${UMBRALES.KG1.mediana.join('–')}, peor ≤ ${UMBRALES.KG1.peorCircuito})${marca('KG1')}`);
 console.log(`  KG2 velocidad de flota  peor circuito ${f(flotaPeor)} m/s   (umbral ≥ ${UMBRALES.KG2})${marca('KG2')}`);
-console.log(`  KG3 hueco sin nada      mediana ${f(huecoMed, 0)} s, peor ${f(huecoPeor, 0)} s   (umbral ≤ ${UMBRALES.KG3.mediana}, peor ≤ ${UMBRALES.KG3.peor})${marca('KG3')}`);
+console.log(`  KG3 hueco sin nada      mediana ${f(huecoMed, 0)} s, percentil 90 ${f(huecoP90, 0)} s, máximo ${f(huecoPeor, 0)} s   (umbral ≤ ${UMBRALES.KG3.mediana}, p90 ≤ ${UMBRALES.KG3.p90})${marca('KG3')}`);
 console.log(`  KG4 pelea               mediana ${f(pelea)} adelantamientos/min   (umbral ≥ ${UMBRALES.KG4})${marca('KG4')}`);
-console.log(`  KG5 habilidad           sin medir: el piloto experto llega con K-202/K-203`);
+const ventajaPorCircuito = circuitos.map((c) => (original ? 0 : mediana(ventajas.get(c.id)!)));
+const vMin = Math.min(...ventajaPorCircuito);
+const vMax = Math.max(...ventajaPorCircuito);
+console.log(
+  original
+    ? '  KG5 habilidad           sin experto: la foto de antes no tenía salida ni miniturbo'
+    : `  KG5 habilidad           el experto gana ${f(100 * vMin, 1)}–${f(100 * vMax, 1)} % según el circuito   (umbral ${100 * UMBRALES.KG5[0]}–${100 * UMBRALES.KG5[1]} % en los cuatro)${marca('KG5')}`,
+);
 console.log(`      objetos             mediana ${f(objetos)} por minuto`);
 
 const fallos: string[] = [];
 if (exigidos.has('KG1') && (durMed < UMBRALES.KG1.mediana[0] || durMed > UMBRALES.KG1.mediana[1] || peorCircuito > UMBRALES.KG1.peorCircuito))
   fallos.push(`KG1: la regata dura ${f(durMed, 1)} min de mediana, ${f(peorCircuito, 1)} en el peor circuito`);
 if (exigidos.has('KG2') && flotaPeor < UMBRALES.KG2) fallos.push(`KG2: la flota va a ${f(flotaPeor)} m/s en el circuito más lento`);
-if (exigidos.has('KG3') && (huecoMed > UMBRALES.KG3.mediana || huecoPeor > UMBRALES.KG3.peor))
-  fallos.push(`KG3: ${f(huecoMed, 0)} s sin que pase nada de mediana, ${f(huecoPeor, 0)} en el peor caso`);
+if (exigidos.has('KG3') && (huecoMed > UMBRALES.KG3.mediana || huecoP90 > UMBRALES.KG3.p90))
+  fallos.push(`KG3: ${f(huecoMed, 0)} s sin que pase nada de mediana, ${f(huecoP90, 0)} en el percentil 90`);
 if (exigidos.has('KG4') && pelea < UMBRALES.KG4) fallos.push(`KG4: ${f(pelea)} adelantamientos por minuto`);
+if (exigidos.has('KG5') && (vMin < UMBRALES.KG5[0] || vMax > UMBRALES.KG5[1]))
+  fallos.push(`KG5: el experto gana entre el ${f(100 * vMin, 1)} % y el ${f(100 * vMax, 1)} %`);
 
 if (original) {
   // La foto de antes no tiene que pasar ninguna puerta: es la referencia.
