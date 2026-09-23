@@ -31,7 +31,19 @@ import {
 import type { Nave, TipoCasco } from '../../engine/tipos.ts';
 import type { Paleta } from '../paleta.ts';
 import { alturaDeOla, inclinacionEn } from './agua.ts';
-import { geometriaDeCasco, geometriaDeRemero, geometriaDeRemo, geometriaDeVela, ZONA_FRANJA } from './barca.ts';
+import {
+  asientoDe,
+  BANCADAS,
+  geometriaDeCasco,
+  geometriaDeRemero,
+  geometriaDeRemo,
+  geometriaDeVela,
+  PARTE,
+  seccion,
+  T_PALO,
+  ZONA_BANCADA,
+  ZONA_FRANJA,
+} from './barca.ts';
 import { anchuraEn, lateralDe, puntoEn, rumboEn, type Trazado } from './trazado.ts';
 
 /** [R-209] Puntos de la tira de estela por barca. */
@@ -41,7 +53,29 @@ const PASO_ESTELA = 0.8;
 /** Segundos que tarda la estela en deshacerse. */
 const VIDA_ESTELA = 3;
 /** Remos por costado, y remeros por barca: uno por bancada. */
-const REMOS_POR_COSTADO = 3;
+const REMOS_POR_COSTADO = BANCADAS.length;
+/**
+ * [R-311] Hacia dónde sopla el viento, en el mismo ángulo que el rumbo. Uno
+ * fijo basta: lo que se quiere es que cada vela vaya cazada a su banda según
+ * su rumbo, no una meteorología.
+ */
+const VIENTO = 0.9;
+/** [R-310] Metros a popa de la bancada donde va el tolete. */
+const TOLETE_A_POPA = 0.3;
+
+/**
+ * [R-305] [R-309] Fracción del puntal que va bajo el agua. Crece con la masa:
+ * una barca cargada va más metida. Es el MISMO número que hunde el casco y que
+ * pinta la línea de flotación: si fueran dos cuentas, la patente saldría por
+ * encima del agua.
+ *
+ * [R-308] Con tope en 0,44: la barca es ABIERTA y su plan va al 52 % del
+ * puntal. Con el tope de antes (0,62) el agua quedaba por encima del plan y se
+ * veía el mar dentro de la lancha, entre las bancadas.
+ */
+export function caladoDe(masa: number): number {
+  return 0.26 + 0.18 * Math.min(1, Math.max(0, (masa - 450) / 1300));
+}
 
 interface Rastro {
   x: number;
@@ -51,12 +85,13 @@ interface Rastro {
 }
 
 /**
- * [R-306] El material del casco: el color del casco por instancia (el de
- * serie de three), la franja por instancia (atributo propio) y la madera de la
- * cubierta, con tablas, de la paleta.
+ * [R-306] [R-309] El material del casco: el color del casco por instancia (el
+ * de serie de three), la franja por instancia (atributo propio), la madera de
+ * dentro con tablas y veta, y la PATENTE por debajo del calado de cada barca,
+ * con una línea de flotación clara encima.
  */
 function materialDeCasco(madera: ColorTres): MeshStandardMaterial {
-  const mat = new MeshStandardMaterial({ roughness: 0.45, metalness: 0.02 });
+  const mat = new MeshStandardMaterial({ roughness: 0.42, metalness: 0.02 });
   mat.onBeforeCompile = (sombreador) => {
     sombreador.uniforms.colorMadera = { value: madera };
     sombreador.vertexShader = sombreador.vertexShader
@@ -65,16 +100,21 @@ function materialDeCasco(madera: ColorTres): MeshStandardMaterial {
         `#include <common>
         attribute float zona;
         attribute vec3 colorFranja;
+        attribute float calado;
         varying float vZona;
         varying vec3 vFranja;
-        varying vec3 vLocal;`,
+        varying vec3 vLocal;
+        varying float vFlotacion;`,
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
         vZona = zona;
         vFranja = colorFranja;
-        vLocal = position;`,
+        vLocal = position;
+        // [R-309] El origen es la borda del centro y la quilla está en −1: el
+        // agua corta el casco en y = −(1 − calado).
+        vFlotacion = -(1.0 - calado);`,
       );
     sombreador.fragmentShader = sombreador.fragmentShader
       .replace(
@@ -83,40 +123,133 @@ function materialDeCasco(madera: ColorTres): MeshStandardMaterial {
         uniform vec3 colorMadera;
         varying float vZona;
         varying vec3 vFranja;
-        varying vec3 vLocal;`,
+        varying vec3 vLocal;
+        varying float vFlotacion;
+        float azarCasco(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+        float ruidoCasco(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(azarCasco(i), azarCasco(i + vec2(1.0, 0.0)), f.x),
+                     mix(azarCasco(i + vec2(0.0, 1.0)), azarCasco(i + vec2(1.0, 1.0)), f.x), f.y);
+        }`,
       )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
+        float rugosidadCasco = 0.42;
         if (vZona > 1.5) {
-          float tabla = fract(vLocal.x * 9.0);
-          float junta = smoothstep(0.0, 0.07, tabla) * smoothstep(1.0, 0.93, tabla);
-          diffuseColor.rgb = colorMadera * (0.62 + 0.38 * junta);
+          // Tablas a lo largo de la eslora, con junta oscura y veta estirada.
+          float tabla = fract((abs(vLocal.x) * 1.6 + vLocal.y) * 7.0);
+          float junta = smoothstep(0.0, 0.08, tabla) * smoothstep(1.0, 0.92, tabla);
+          float veta = ruidoCasco(vec2(vLocal.z * 9.0, (abs(vLocal.x) + vLocal.y) * 90.0));
+          float claro = vZona > ${((ZONA_BANCADA + 2) / 2).toFixed(2)} ? 1.2 : 1.0;
+          // Lo hondo de la barca, más oscuro: oclusión de pobre.
+          float hondo = 0.7 + 0.3 * smoothstep(-0.65, -0.05, vLocal.y);
+          diffuseColor.rgb = colorMadera * claro * hondo * (0.66 + 0.34 * junta) * (0.85 + 0.3 * veta);
+          rugosidadCasco = 0.62;
         } else if (vZona > ${ZONA_FRANJA.toFixed(2)}) {
           diffuseColor.rgb = vFranja;
+          rugosidadCasco = 0.3;
+        } else if (vLocal.y < vFlotacion + 0.06) {
+          // [R-309] Patente: el fondo pintado de rojo oscuro, mate.
+          diffuseColor.rgb = vec3(0.24, 0.05, 0.04);
+          rugosidadCasco = 0.8;
+        } else if (vLocal.y < vFlotacion + 0.1) {
+          // [R-309] La línea de flotación.
+          diffuseColor.rgb = vec3(0.85, 0.84, 0.8);
+          rugosidadCasco = 0.35;
         }`,
+      )
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>
+        roughnessFactor = rugosidadCasco;`,
       );
   };
-  mat.customProgramCacheKey = () => 'casco-r306';
+  mat.customProgramCacheKey = () => 'casco-r309';
   return mat;
 }
 
-/** [R-307] El remero: camiseta del color de la franja (por instancia) y cara de la paleta. */
+/**
+ * [R-307] [R-310] El remero: camiseta del color de la franja (por instancia),
+ * cara y brazos de la paleta, pantalón oscuro y gorra clara.
+ */
 function materialDeRemero(piel: ColorTres): MeshStandardMaterial {
   const mat = new MeshStandardMaterial({ roughness: 0.8, flatShading: true });
   mat.onBeforeCompile = (sombreador) => {
     sombreador.uniforms.colorPiel = { value: piel };
     sombreador.vertexShader = sombreador.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float piel;\nvarying float vPiel;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPiel = piel;');
+      .replace('#include <common>', '#include <common>\nattribute float parte;\nvarying float vParte;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvParte = parte;');
     sombreador.fragmentShader = sombreador.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 colorPiel;\nvarying float vPiel;')
+      .replace('#include <common>', '#include <common>\nuniform vec3 colorPiel;\nvarying float vParte;')
       .replace(
         '#include <color_fragment>',
-        '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, colorPiel, step(0.5, vPiel));',
+        `#include <color_fragment>
+        if (vParte > ${(PARTE.gorra - 0.5).toFixed(1)}) diffuseColor.rgb = vec3(0.86, 0.85, 0.8);
+        else if (vParte > ${(PARTE.pantalon - 0.5).toFixed(1)}) diffuseColor.rgb = vec3(0.07, 0.08, 0.11);
+        else if (vParte > ${(PARTE.piel - 0.5).toFixed(1)}) diffuseColor.rgb = colorPiel;`,
       );
   };
-  mat.customProgramCacheKey = () => 'remero-r307';
+  mat.customProgramCacheKey = () => 'remero-r310';
+  return mat;
+}
+
+/** [R-310] El remo: caña de madera y la pala con el color de la franja (por instancia). */
+function materialDeRemo(): MeshStandardMaterial {
+  const mat = new MeshStandardMaterial({ roughness: 0.5 });
+  mat.onBeforeCompile = (sombreador) => {
+    sombreador.vertexShader = sombreador.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float pala;\nvarying float vPala;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPala = pala;');
+    sombreador.fragmentShader = sombreador.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vPala;')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        diffuseColor.rgb = mix(diffuse, vColor.rgb, step(0.5, vPala));`,
+      );
+  };
+  mat.customProgramCacheKey = () => 'remo-r310';
+  return mat;
+}
+
+/**
+ * [R-311] La vela: paños cosidos, una franja del color de la barca y el palo y
+ * la botavara de madera. El color de la vela va por instancia.
+ */
+function materialDeVela(madera: ColorTres): MeshStandardMaterial {
+  const mat = new MeshStandardMaterial({ roughness: 0.85, side: DoubleSide });
+  mat.onBeforeCompile = (sombreador) => {
+    sombreador.uniforms.colorMadera = { value: madera };
+    sombreador.vertexShader = sombreador.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute float parte;\nattribute vec3 colorFranja;\nvarying float vParte;\nvarying vec3 vFranja;\nvarying vec3 vLocal;',
+      )
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvParte = parte;\nvFranja = colorFranja;\nvLocal = position;');
+    sombreador.fragmentShader = sombreador.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform vec3 colorMadera;\nvarying float vParte;\nvarying vec3 vFranja;\nvarying vec3 vLocal;',
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        if (vParte > 0.5) {
+          diffuseColor.rgb = colorMadera * 0.8;
+        } else {
+          // Paños: costuras perpendiculares a la baluma.
+          float pano = fract((vLocal.y - vLocal.z * 0.35) * 9.0);
+          diffuseColor.rgb *= 0.9 + 0.1 * smoothstep(0.0, 0.06, pano);
+          // Una franja en diagonal con el color de la barca.
+          float franja = vLocal.y + vLocal.z * 0.55;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vFranja, step(0.46, franja) * step(franja, 0.53));
+        }`,
+      );
+  };
+  mat.customProgramCacheKey = () => 'vela-r311';
   return mat;
 }
 
@@ -185,9 +318,13 @@ export class Flota {
   private readonly aDestruir: { dispose(): void }[] = [];
   private readonly rastros: Rastro[][] = [];
   private readonly fases: number[];
+  /** [R-311] Ángulo de cada botavara con el plano de crujía, para los tests. */
+  private readonly escotas: number[];
+  private ultimaOla = { tiempo: 0, oleaje: 0 };
 
   constructor(naves: readonly Nave[], paleta: Paleta) {
     this.fases = naves.map(() => 0);
+    this.escotas = naves.map(() => 0);
     for (const _ of naves) this.rastros.push([]);
     const color = new ColorTres();
 
@@ -201,6 +338,9 @@ export class Flota {
       const franjas = new Float32Array(indices.length * 3);
       indices.forEach((indiceNave, k) => color.set(naves[indiceNave]!.colores.franja).toArray(franjas, k * 3));
       geo.setAttribute('colorFranja', new InstancedBufferAttribute(franjas, 3));
+      // [R-309] El calado de cada barca, para pintar la patente donde toca.
+      const calados = new Float32Array(indices.map((i) => caladoDe(naves[i]!.barca.masa)));
+      geo.setAttribute('calado', new InstancedBufferAttribute(calados, 1));
       const malla = new InstancedMesh(geo, matCasco, indices.length);
       malla.castShadow = true;
       malla.receiveShadow = true;
@@ -212,9 +352,12 @@ export class Flota {
       this.aDestruir.push(geo);
     }
 
-    // -- Velas: le dan silueta a la barca a cincuenta metros ---------------
+    // -- [R-311] Velas con su palo: le dan silueta a la barca a cincuenta metros
     const geoVela = geometriaDeVela();
-    const matVela = new MeshStandardMaterial({ roughness: 0.9, side: DoubleSide });
+    const franjasVela = new Float32Array(naves.length * 3);
+    naves.forEach((n, i) => color.set(n.colores.franja).toArray(franjasVela, i * 3));
+    geoVela.setAttribute('colorFranja', new InstancedBufferAttribute(franjasVela, 3));
+    const matVela = materialDeVela(new ColorTres(paleta.madera));
     this.velas = new InstancedMesh(geoVela, matVela, naves.length);
     this.velas.frustumCulled = false;
     this.velas.castShadow = true;
@@ -225,10 +368,16 @@ export class Flota {
 
     // -- Remos: todos los de todas las barcas en UNA malla -----------------
     const geoRemo = geometriaDeRemo();
-    const matRemo = new MeshStandardMaterial({ color: new ColorTres(paleta.madera), roughness: 0.6 });
+    const matRemo = materialDeRemo();
+    matRemo.color.set(paleta.madera);
     this.remos = new InstancedMesh(geoRemo, matRemo, naves.length * REMOS_POR_COSTADO * 2);
     this.remos.frustumCulled = false;
     this.remos.castShadow = true;
+    // [R-310] La pala, del color de la franja: se sabe de quién es cada remo.
+    naves.forEach((n, i) => {
+      for (let k = 0; k < REMOS_POR_COSTADO * 2; k++) this.remos.setColorAt(i * REMOS_POR_COSTADO * 2 + k, color.set(n.colores.franja));
+    });
+    if (this.remos.instanceColor !== null) this.remos.instanceColor.needsUpdate = true;
     this.raiz.add(this.remos);
     this.aDestruir.push(geoRemo, matRemo);
 
@@ -286,12 +435,19 @@ export class Flota {
     dt: number,
   ): void {
     const m = new Matrix4();
+    const mCasco = new Matrix4();
     const q = new Quaternion();
+    const qCasco = new Quaternion();
+    const qInclina = new Quaternion();
     const e = new Euler();
     const sitio = new Vector3();
+    const punto = new Vector3();
     const escala = new Vector3();
     const uno = new Vector3(1, 1, 1);
+    const ejeX = new Vector3(1, 0, 0);
+    const ejeY = new Vector3(0, 1, 0);
     let remo = 0;
+    this.ultimaOla = { tiempo, oleaje };
 
     for (const [, grupo] of this.cascos) {
       grupo.indices.forEach((i, k) => {
@@ -302,68 +458,83 @@ export class Flota {
         // la proa ARRIBA: por eso va con el signo cambiado. Con el signo de
         // serie las barcas cabeceaban al revés que la ola que tenían debajo.
         e.set(-sitio3.cabeceo, sitio3.rumbo, sitio3.balanceo, 'YXZ');
-        q.setFromEuler(e);
+        qCasco.setFromEuler(e);
         // [R-305] El calado sube con el desplazamiento: una barca cargada va
         // más metida en el agua, y se ve.
         //
-        // El casco unitario tiene la QUILLA en y = −1 y la CUBIERTA en y = 0,
-        // así que el origen del objeto es la cubierta. Para que la línea de
-        // flotación corte el casco a la altura que toca hay que SUBIRLO
+        // El casco unitario tiene la QUILLA en y = −1 y la BORDA en y = 0, así
+        // que el origen del objeto es la borda. Para que la línea de flotación
+        // corte el casco a la altura que toca hay que SUBIRLO
         // `puntal·(1 − calado)`, no bajarlo `puntal·calado`: bajándolo, la
         // cubierta quedaba por debajo del agua y de las ocho barcas solo se
         // veían las velas y los remos, como aletas saliendo del mar.
+        const casco = nave.barca.casco;
         const puntal = nave.barca.manga * 0.55;
-        const calado = 0.3 + Math.min(0.32, (nave.barca.masa - 500) / 3200);
+        const calado = caladoDe(nave.barca.masa);
         sitio.set(sitio3.x, sitio3.y + puntal * (1 - calado), sitio3.z);
         escala.set(nave.barca.manga, puntal, nave.barca.eslora);
-        m.compose(sitio, q, escala);
-        grupo.malla.setMatrixAt(k, m);
+        mCasco.compose(sitio, qCasco, escala);
+        grupo.malla.setMatrixAt(k, mCasco);
+        // Un punto del casco unitario, llevado al mundo con la barca: así el
+        // remero se sienta en SU bancada y el palo sale de SU sitio aunque la
+        // ola la cabecee.
+        const aMundo = (x: number, y: number, z: number): Vector3 => punto.set(x, y, z).applyMatrix4(mCasco);
 
-        // La vela, plantada un poco por delante del centro.
-        const alto = Math.max(1.6, nave.barca.eslora * 0.26);
-        const cubierta = sitio3.y + puntal * (1 - calado);
-        sitio.set(
-          sitio3.x + Math.sin(sitio3.rumbo) * nave.barca.eslora * 0.1,
-          cubierta,
-          sitio3.z + Math.cos(sitio3.rumbo) * nave.barca.eslora * 0.1,
-        );
-        escala.set(1, alto, alto);
-        m.compose(sitio, q, escala);
+        // [R-311] El palo, plantado en crujía, y la vela cazada a sotavento: se
+        // abre del plano de crujía, así que también se ve desde popa.
+        const relativo = sitio3.rumbo - VIENTO;
+        const banda = Math.sin(relativo) >= 0 ? 1 : -1;
+        const escota = banda * (0.32 + 0.38 * (0.5 + 0.5 * Math.cos(relativo)));
+        this.escotas[i] = escota;
+        const alto = Math.max(2, nave.barca.eslora * 0.3);
+        const palo = seccion(casco, T_PALO);
+        aMundo(0, palo.borda, T_PALO - 0.5);
+        q.setFromAxisAngle(ejeY, escota).premultiply(qCasco);
+        // La panza va a sotavento: si la botavara sale a babor, la vela se
+        // refleja. El material es de dos caras, así que la luz no se entera.
+        escala.set(escota > 0 ? -alto : alto, alto, alto);
+        m.compose(punto, q, escala);
         this.velas.setMatrixAt(i, m);
 
         // [R-304] Los remos van con el empuje pedido, no con el reloj: a gas 0
         // se quedan quietos.
-        this.fases[i] = (this.fases[i] ?? 0) + dt * (2.4 + nave.velocidad * 0.9) * Math.min(1, nave.gas);
-        const fase = this.fases[i]!;
+        const gas = Math.min(1, nave.gas);
+        this.fases[i] = (this.fases[i] ?? 0) + dt * (2.4 + nave.velocidad * 0.9) * gas;
+        const largo = nave.barca.manga * 0.85 + 1.3;
         for (let p = 0; p < REMOS_POR_COSTADO; p++) {
-          const z = nave.barca.eslora * (0.22 - (p / REMOS_POR_COSTADO) * 0.42);
-          const boga = Math.sin(fase + p * 0.5) * 0.45 * Math.min(1, nave.gas);
+          // [R-310] La palada: de `fase` 0 a π la pala barre de proa a popa
+          // DENTRO del agua; de π a 2π vuelve por el aire, de plano.
+          const fase = this.fases[i]! + p * 0.35;
+          const barrido = -Math.cos(fase) * 0.5 * gas;
+          const enAgua = Math.min(1, Math.max(0, Math.sin(fase) * 3 + 0.6));
+          const tTolete = BANCADAS[p]! - TOLETE_A_POPA / nave.barca.eslora;
+          const tolete = seccion(casco, tTolete);
           for (const lado of [-1, 1]) {
-            const largo = nave.barca.manga * 0.72 + 0.6;
-            // El remo sale del costado hacia fuera y hacia abajo.
-            e.set(boga * 0.5, sitio3.rumbo + (lado > 0 ? 0 : Math.PI), -0.35 + boga, 'YXZ');
-            q.setFromEuler(e);
-            const costado = nave.barca.manga * 0.45 * lado;
-            sitio.set(
-              sitio3.x + Math.cos(sitio3.rumbo) * costado + Math.sin(sitio3.rumbo) * z,
-              cubierta + 0.12,
-              sitio3.z - Math.sin(sitio3.rumbo) * costado + Math.cos(sitio3.rumbo) * z,
+            const pivote = aMundo(lado * tolete.semi, tolete.borda, tTolete - 0.5);
+            // [R-310] Lo justo para que la pala entre en el agua: se mide la
+            // altura del tolete sobre la ola, no se supone.
+            const sobreAgua = pivote.y - alturaDeOla(pivote.x, pivote.z, tiempo, oleaje);
+            const hundir = Math.asin(Math.min(0.95, Math.max(0.05, (sobreAgua + 0.08) / (largo * 0.86))));
+            e.set(
+              (Math.PI / 2) * (1 - enAgua),
+              (lado > 0 ? 0 : Math.PI) + lado * barrido,
+              -(hundir - 0.2 * (1 - enAgua)),
+              'YZX',
             );
+            q.setFromEuler(e).premultiply(qCasco);
             escala.set(largo, 1, 1);
-            m.compose(sitio, q, escala);
+            m.compose(pivote, q, escala);
             this.remos.setMatrixAt(remo++, m);
           }
 
-          // [R-307] El remero de esa bancada, mirando a popa como se rema, y
-          // echándose atrás con la boga.
-          e.set(sitio3.cabeceo - boga * 0.9, sitio3.rumbo + Math.PI, -sitio3.balanceo, 'YXZ');
-          q.setFromEuler(e);
-          sitio.set(
-            sitio3.x + Math.sin(sitio3.rumbo) * (z - 0.35),
-            cubierta - 0.12,
-            sitio3.z + Math.cos(sitio3.rumbo) * (z - 0.35),
-          );
-          m.compose(sitio, q, uno);
+          // [R-307] [R-310] El remero, sentado en su bancada, mirando a popa
+          // como se rema: se echa hacia delante al meter la pala y atrás al
+          // sacarla.
+          const asiento = asientoDe(casco, p);
+          q.setFromAxisAngle(ejeY, Math.PI).premultiply(qCasco);
+          qInclina.setFromAxisAngle(ejeX, 0.32 * Math.cos(fase) * gas);
+          q.multiply(qInclina);
+          m.compose(aMundo(0, asiento.y, asiento.z), q, uno);
           this.remeros.setMatrixAt(i * REMOS_POR_COSTADO + p, m);
         }
 
@@ -471,6 +642,27 @@ export class Flota {
   /** [R-209] Para los tests: las posiciones de la tira de estela. */
   verticesDeEstela(): Float32Array {
     return (this.geoEstela.getAttribute('position') as BufferAttribute).array as Float32Array;
+  }
+
+  /** [R-311] Para los tests: el ángulo de cada vela con el plano de crujía. */
+  angulosDeEscota(): readonly number[] {
+    return this.escotas;
+  }
+
+  /**
+   * [R-310] Para los tests: cuánto está cada pala por DEBAJO de la ola que
+   * tiene encima, en metros (negativo: en el aire).
+   */
+  hundimientoDePalas(): number[] {
+    const m = new Matrix4();
+    const p = new Vector3();
+    const fuera: number[] = [];
+    for (let i = 0; i < this.remos.count; i++) {
+      this.remos.getMatrixAt(i, m);
+      p.set(0.86, 0, 0).applyMatrix4(m);
+      fuera.push(alturaDeOla(p.x, p.z, this.ultimaOla.tiempo, this.ultimaOla.oleaje) - p.y);
+    }
+    return fuera;
   }
 
   /** [R-302] Para los tests y el diagnóstico: cuántas mallas dibuja la flota. */

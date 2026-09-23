@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | SPEC-004 |
 | **Título** | El agua se mueve, la barca cabecea sobre ella y la cámara mira por donde va el circuito |
-| **Estado** | ✅ `COMPLETADA` (Fases R1 y R2) |
+| **Estado** | ✅ `COMPLETADA` (Fases R1, R2 y R3) |
 | **Autor** | — |
 | **Creado** | 2026-09-16 |
 | **Módulos afectados** | `src/render/**`, `src/juego/motor.ts`, `src/components/Lienzo.tsx` |
@@ -86,6 +86,15 @@ sobra. **No vuelvas a proponerlo sin traer una medición de tiempo de carga en 4
 | **DR11** | `mundo.ts` | La cámara de sombras era la de serie (±5 m alrededor del origen) y `PCFSoftShadowMap` ya no existe en three 0.186 | **0** barcas con sombra fuera del origen; un aviso en la consola en cada regata | Las sombras costaban un pase de dibujo y no se veían |
 | **DR12** | `mundo.ts` | Islas = dos icosaedros (roca y un capuchón verde) | Siluetas de globo; con la niebla lineal a **219 m** en `faro`, todas del mismo azul claro | No se leía costa, se leían manchas |
 
+**Auditoría visual de las barcas 2026-09-23** (capturas de cerca, a 5–8 m de cada casco, en `ria`):
+
+| ID | Fichero | Defecto | Medición | Consecuencia |
+|---|---|---|---|---|
+| **DR13** | `barca.ts` | El casco era un tubo de 13 secciones con una tapa plana a la altura de la borda | **286 triángulos** por casco; borda recta, sin espejo de popa, sin interior | De cerca se leía como una vaina de guisante con tapa, no como una barca |
+| **DR14** | `barca.ts` | El remero era una caja con un octaedro encima, sentado **sobre la tapa** | **20 triángulos**; sin brazos ni piernas | Se leían como fichas de parchís, no como gente remando |
+| **DR15** | `flota.ts` | El remo giraba sobre su propio eje en vez de barrer, y era corto | La pala quedaba **0,1–0,3 m por encima del agua** en toda la palada; los remos de una chalana se cruzaban | Remos que aletean en el aire: la barca no parecía moverse por ellos |
+| **DR16** | `flota.ts` | La vela iba en el plano de crujía, sin palo ni botavara | **0°** de escota; ningún palo | Un triángulo flotando; la del jugador, de canto e invisible (ver `index.md`) |
+
 ---
 
 ## 4. Arquitectura objetivo
@@ -97,6 +106,7 @@ src/render/
     trazado.ts       NUEVO  Circuito → eje en el mundo. PURO          [R-1xx]
     agua.ts          NUEVO  Gerstner, espuma, estela                  [R-2xx]
     barca.ts         NUEVO  Malla procedural de casco y remos         [R-3xx]
+                     (Fase R3: forma, interior, remero y aparejo  [R-308]–[R-311])
     flota.ts         NUEVO  Las 8 barcas en pocas llamadas            [R-302]
     mundo.ts         NUEVO  Cielo, costa, islas, boyas, huevos        [R-4xx]
     vista.ts         NUEVO  Renderizador y cámara. Lo único que toca GL [R-5xx]
@@ -146,6 +156,10 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | **R-305** | El casco se hunde con el desplazamiento: una barca con 5 tripulantes va más metida en el agua | El calado de la malla crece con `masa` |
 | **R-306** | **El casco tiene tres zonas de color**: obra viva con el color del casco, una **franja** en la borda con el color `franja` de la barca y la **cubierta de madera**. Sin mallas nuevas: una marca por vértice y el color de franja por instancia | Test: la geometría del casco marca borda y cubierta, y la flota sigue en ≤ 6 llamadas (`R-302`) |
 | **R-307** | **Se ve quién rema**: un remero por bancada con la camiseta del color `franja`, que se inclina con la boga (`R-304`), y remos con **pala**. Todos los remeros de las ocho barcas van en una sola malla instanciada | La flota entera sigue en **≤ 6 llamadas de dibujo** (`R-302`) |
+| **R-308** | **El casco tiene forma de barca** (`DR13`): **arrufo** —la borda sube hacia proa y algo hacia popa—, roda, **espejo de popa**, quilla y, el de desplazamiento, **tingladillo** (tracas solapadas que dan escalón de luz); el planeador, **codillo** vivo entre fondo en V y costado. Y es una barca **abierta**: forro interior, plan, **bancadas** donde se sientan los remeros, regala y cubiertas de proa y popa. Sigue siendo UNA geometría unitaria por tipo de casco (`R-302`) | Test: la borda en proa ≥ 0,15 más alta que en el centro; hay bancadas; ≤ **4 000 triángulos** por casco; la relación eslora/manga sigue en ± 5 % (`R-303`) |
+| **R-309** | **La flotación se ve**: por debajo del calado de cada barca el casco lleva **patente** (pintura de fondo) y encima una **línea de flotación** clara. El calado va por instancia y es el MISMO número que hunde la barca (`R-305`) | Test: el atributo de calado por instancia es el de `caladoDe(masa)` y crece con la masa |
+| **R-310** | **Remeros con cuerpo y remos que reman** (`DR14`, `DR15`): cabeza redonda con gorra, brazos hasta el guion, piernas; sentados en SU bancada y girando con el casco. El remo pivota en el tolete, **barre** a proa y popa, **la pala entra en el agua** en la palada y sale de plano en la recogida. La pala lleva el color de la franja | Test: en la palada, la pala de cada remo llega por debajo de la superficie de la ola |
+| **R-311** | **La vela tiene palo y botavara y va cazada a sotavento** (`DR16`): se abre del plano de crujía según el rumbo contra un viento fijo del circuito, así que **la del jugador se ve desde popa**. Lleva paños y una franja del color de la barca | Test: ninguna vela va a menos de 0,25 rad del plano de crujía |
 
 ### R-4xx · El mundo
 
@@ -270,6 +284,36 @@ que las barcas (`R-402`).
 
 ---
 
+### Fase R3 — Barcas que se leen como barcas · ✅ **CERRADA 2026-09-23**
+**Alcance:** `R-308` – `R-311`
+**Puerta:** los tests de siempre en verde más los nuevos; la flota **sigue en ≤ 6 llamadas** (`R-302`);
+cada casco en **≤ 4 000 triángulos**; los cuatro circuitos abiertos en Chromium sin errores ni avisos
+de consola, y **las capturas antes/después miradas** (`§6.3`), de cerca y en la vista de juego.
+**Resultado:** 164 tests en verde (5 nuevos en `render-barcas.test.ts`) · `tsc --noEmit` limpio ·
+`vite build` correcto · los cuatro circuitos abiertos en Chromium sin un error ni un aviso de consola.
+
+| Comprobación | Resultado |
+|---|---|
+| `R-302` · mallas de la flota | **6**, sin cambio (umbral ≤ 6) |
+| `R-308` · triángulos por casco | **2 264** desplazamiento · **2 034** planeador (antes 286; tope 4 000) |
+| `R-310` · triángulos por remero | **468** (antes 20) |
+| `R-310` · hondura de la pala | **0,08 – 0,29 m** bajo la ola en la palada; **0,38 – 0,86 m** fuera en la recogida (antes, siempre fuera) |
+| `R-311` · escota | **≥ 0,32 rad** del plano de crujía en todas las barcas, todo el rato |
+| Llamadas de dibujo, escena completa | **35**, sin cambio |
+| Triángulos por fotograma, mismo arnés y mismo instante | **190 k – 212 k** (antes 138 k – 156 k): +55 k, la mitad es el pase de sombras |
+| Paquete de la aplicación | **237,5 KB** comprimido (antes 233,9): +3,6 KB. Ni una textura ni un modelo |
+
+**Lo que la medición cambió:** la primera versión tenía **el mar dentro de la lancha**: con el calado
+de antes (hasta 0,62 del puntal) la línea de flotación de una barca cargada quedaba por encima del
+plan, y en la captura se veía agua entre las bancadas. El calado se quedó en 0,26 – 0,44 (`caladoDe`),
+que sigue creciendo con la masa (`R-305`). Además: **el remo no barría**, giraba sobre su propio eje
+—el giro en X de antes era el de la caña, no el de la palada—, y el espejo de popa salió con las
+caras al revés y se veía el interior por detrás. Con 34 secciones y tres puntos por traca el casco
+llegaba a 3 356 triángulos; con dos puntos por traca (una tabla es plana) y 30 secciones no se nota
+y baja a 2 264.
+
+---
+
 ## 8. Riesgos
 
 | Riesgo | Impacto | Mitigación |
@@ -321,3 +365,7 @@ export function alturaDeOla(x: number, z: number, t: number, oleaje: number): nu
 | DR10 · raya en el horizonte | `R-207` | R2 | ✅ | `[R-207] el agua, la escena y el cielo comparten niebla` |
 | DR11 · sombras en el origen | `R-506` | R2 | ✅ | captura (§6.3) |
 | DR12 · islas de globo | `R-407` | R2 | ✅ | `[R-404] mismo circuito, misma costa` |
+| DR13 · casco de vaina con tapa | `R-308` | R3 | ✅ | `[R-308] el casco tiene arrufo, bancadas y tope de triángulos` |
+| DR14 · remeros de parchís | `R-310` | R3 | ✅ | captura (§6.3) |
+| DR15 · remos que no tocan el agua | `R-310` | R3 | ✅ | `[R-310] la pala entra en el agua en la palada` |
+| DR16 · vela de canto sin palo | `R-311` | R3 | ✅ | `[R-311] la vela va cazada, fuera de crujía` |
