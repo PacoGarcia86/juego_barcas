@@ -65,7 +65,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | [SPEC-003](003-astillero-y-tripulacion.md) | El astillero y la tripulación | `A-` | ✅ COMPLETADA (Fase A1) |
 | [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1 y R2) |
 | [SPEC-005](005-progreso-y-despliegue.md) | Progreso, aplicación y despliegue | `P-` | ✅ COMPLETADA (Fase P1) |
-| [SPEC-006](006-ritmo-de-kart.md) | Ritmo de kart | `K-` | 📋 BORRADOR |
+| [SPEC-006](006-ritmo-de-kart.md) | Ritmo de kart | `K-` | 🚧 EN CURSO (Fase K1) |
 
 ---
 

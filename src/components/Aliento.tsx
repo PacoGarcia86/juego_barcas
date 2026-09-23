@@ -5,6 +5,7 @@
 // cómo está la gente, no cuántos vatios quedan.
 
 import type { Efecto, Nave } from '../engine/tipos.ts';
+import { segundosReales } from '../engine/ritmo.ts';
 
 const NOMBRES: Record<Efecto['tipo'], string> = {
   turbo: 'racha de viento',
@@ -32,7 +33,7 @@ export default function Aliento({ nave }: { nave: Nave }) {
           <div className="mt-1 flex flex-wrap justify-center gap-1">
             {nave.efectos.map((e, i) => (
               <span key={i} className="tarjeta-plana px-2 py-0.5 text-[10px] text-tinta-300">
-                {NOMBRES[e.tipo]} · {e.restante.toFixed(1)} s
+                {NOMBRES[e.tipo]} · {segundosReales(e.restante).toFixed(1)} s
               </span>
             ))}
           </div>

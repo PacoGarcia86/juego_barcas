@@ -9,6 +9,7 @@ import type { Inscripcion } from '../engine/carrera.ts';
 import { barcaEfectiva } from '../engine/barcas.ts';
 import { BARCAS, barcaPorId } from '../engine/datos/barcas.ts';
 import { MotorDeRegata } from '../juego/motor.ts';
+import { segundosReales } from '../engine/ritmo.ts';
 import type { Diagnostico } from '../render/tresd/vista.ts';
 import Lienzo from '../components/Lienzo.tsx';
 import Tablero from '../components/Tablero.tsx';
@@ -134,8 +135,9 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
               {final.posicion}.º de {est.naves.length}
             </h2>
             <ul className="grid gap-1 text-sm text-tinta-300">
-              <li>Tiempo: {final.tiempo.toFixed(2).replace('.', ',')} s</li>
-              {final.diferencia > 0 && <li>A {final.diferencia.toFixed(2).replace('.', ',')} s del ganador</li>}
+              {/* [K-103] En segundos de pantalla, no de simulación. */}
+              <li>Tiempo: {segundosReales(final.tiempo).toFixed(2).replace('.', ',')} s</li>
+              {final.diferencia > 0 && <li>A {segundosReales(final.diferencia).toFixed(2).replace('.', ',')} s del ganador</li>}
               <li>Huevos rotos: {final.huevos}</li>
               <li className={final.limpia ? 'text-[var(--color-bien)]' : 'text-[var(--color-mal)]'}>
                 {final.limpia

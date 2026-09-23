@@ -70,6 +70,8 @@ export class Vista {
   private metrosCamara = 0;
   private lateralCamara = 0;
   private fovActual = FOV_PARADO;
+  /** [K-101] Segundos REALES desde que se abrió la vista. El mar va con este. */
+  private tiempoMar = 0;
   private malos = 0;
   private simplificado = false;
   private ultimoFps = 60;
@@ -146,10 +148,16 @@ export class Vista {
     this.camara.fov = this.fovActual;
     this.camara.updateProjectionMatrix();
 
-    this.agua.actualizar(this.camara, est.reloj, oleaje);
-    this.mundo.actualizarHuevos(est.huevos, est.reloj, oleaje);
-    this.mundo.actualizarBoyas(est.reloj, oleaje);
-    this.flota.actualizar(est.naves, this.trazado, est.reloj, oleaje, dt);
+    // [K-101] El mar va con el reloj REAL, acumulado aquí con el `dt` de
+    // pantalla: la regata corre a `RITMO`, pero un mar acelerado se ve de
+    // dibujos animados. Barcas, huevos y boyas flotan sobre la misma ola, así
+    // que todos leen este mismo tiempo.
+    this.tiempoMar += dt;
+    const tiempoMar = this.tiempoMar;
+    this.agua.actualizar(this.camara, tiempoMar, oleaje);
+    this.mundo.actualizarHuevos(est.huevos, tiempoMar, oleaje);
+    this.mundo.actualizarBoyas(tiempoMar, oleaje);
+    this.flota.actualizar(est.naves, this.trazado, tiempoMar, oleaje, dt);
 
     this.renderizador.render(this.escena, this.camara);
 

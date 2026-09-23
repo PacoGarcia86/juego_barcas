@@ -1,38 +1,18 @@
-// [B-104] Los cuatro circuitos. Dato declarativo: cambiar el oleaje de uno es
-// cambiar una línea, nunca tocar lógica.
+// [K-001] Los cuatro circuitos TAL COMO ERAN antes del recorte de `K-102`.
 //
-// **Todos declaran `procedencia: 'ficticio'`** y la pantalla lo enseña. No hay
-// circuitos reales en el juego: un dato aproximado sin etiqueta se convierte en
-// un dato falso.
-//
-// [B-102] Ningún tramo pasa del 30 % de la vuelta. Hay test estático.
-//
-// [R-105] **Los cuatro son CIRCUITOS: sus curvas suman una vuelta entera.**
-// `Σ longitud/radio = ±2π`. Un circuito cuyas curvas no la suman no se puede
-// cerrar sin deformarlo, y los cuatro empezaron así: `faro` giraba −0,24 rad de
-// los 6,28 que hacen falta (`DR7`).
-//
-// Y los tramos rectos entre curva y curva miden **lo mismo**. El rumbo puede
-// cerrar y la vuelta seguir sin cerrar en posición: con los rectos desiguales,
-// la polilínea de `faro` medía 1 037 m para los 1 380 declarados y el mundo
-// salía encogido un 25 % (`DR6`).
-//
-// [K-102] **Dos vueltas en los cuatro**, y los tramos tal cual. Para que la
-// regata dure lo que una de kart se recortaron las vueltas, no la geometría:
-// con los radios escalados el patín ganaba el 62 % de las regatas y la trainera
-// y la galeota ninguna, y con solo las rectas recortadas se quedaban sin ganar
-// la lancha y la galeota (`B-202`, SPEC-006). La copia de antes del recorte
-// vive en `scripts/circuitos-originales.ts` y un test comprueba que los tramos
-// no se han movido.
+// No los usa el juego: solo `npm run diversion -- --original`, para que la
+// medición de SPEC-006 §3 (12,4 min por regata, 47 s sin que pase nada) se
+// pueda repetir siempre y la comparación antes/después no dependa de la
+// memoria de nadie. No se editan.
 
-import type { Circuito } from '../tipos.ts';
+import type { Circuito } from '../src/engine/tipos.ts';
 
-export const CIRCUITOS: Circuito[] = [
+export const CIRCUITOS_ORIGINALES: Circuito[] = [
   {
     id: 'ria',
     nombre: 'La Ría',
     procedencia: 'ficticio',
-    vueltas: 2,
+    vueltas: 3,
     oleajeBase: 0.05,
     hora: 'amanecer',
     descripcion: 'Agua quieta, corriente de río y una serpiente de curvas de radio 30. Se gana con el timón, no con la recta.',
@@ -58,7 +38,7 @@ export const CIRCUITOS: Circuito[] = [
     id: 'faro',
     nombre: 'El Faro',
     procedencia: 'ficticio',
-    vueltas: 2,
+    vueltas: 3,
     oleajeBase: 0.45,
     hora: 'tarde',
     descripcion: 'Mar abierto, marejada y dos curvones. Aquí manda la eslora, y el aguante.',
@@ -76,7 +56,7 @@ export const CIRCUITOS: Circuito[] = [
     id: 'canal',
     nombre: 'El Canal',
     procedencia: 'ficticio',
-    vueltas: 2,
+    vueltas: 3,
     oleajeBase: 0,
     hora: 'mediodia',
     descripcion: 'Agua de espejo, paredes cerca y codos de radio 26 encadenados. Aquí no se adelanta: se aprovecha un error.',
@@ -112,7 +92,3 @@ export const CIRCUITOS: Circuito[] = [
     ],
   },
 ];
-
-export function circuitoPorId(id: string): Circuito | undefined {
-  return CIRCUITOS.find((c) => c.id === id);
-}

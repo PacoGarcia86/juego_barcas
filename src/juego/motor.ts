@@ -10,10 +10,12 @@ import { clasificar } from '../engine/clasificacion.ts';
 import { doblonesDe } from '../engine/economia.ts';
 import { huevosDe } from '../engine/huevos.ts';
 import { crearRng, type Rng } from '../engine/rng.ts';
+import { RITMO } from '../engine/ritmo.ts';
 import type { Circuito, EstadoRegata, Mando, Resultado } from '../engine/tipos.ts';
 
-/** Tope de pasos por fotograma: si la pestaña vuelve de segundo plano tras un
- *  minuto, no se simulan mil segundos de golpe y se cuelga el navegador. */
+/** Tope de pasos por fotograma y por unidad de `RITMO`: si la pestaña vuelve
+ *  de segundo plano tras un minuto, no se simulan mil segundos de golpe y se
+ *  cuelga el navegador. */
 const TOPE_PASOS = 6;
 
 export class MotorDeRegata {
@@ -22,7 +24,15 @@ export class MotorDeRegata {
   private acumulado = 0;
   private resultado: Resultado | null = null;
 
-  constructor(circuito: Circuito, inscritos: Inscripcion[], semilla: number) {
+  /**
+   * [K-101] `ritmo` son segundos de simulación por segundo real. Solo cambia
+   * cuántos pasos caben en un fotograma: la secuencia de estados es la misma
+   * con cualquier ritmo, y por eso `B-901` sigue siendo cierto.
+   */
+  readonly ritmo: number;
+
+  constructor(circuito: Circuito, inscritos: Inscripcion[], semilla: number, ritmo: number = RITMO) {
+    this.ritmo = ritmo;
     this.rng = crearRng(semilla);
     this.estado = crearRegata(circuito, inscritos, this.rng, huevosDe(circuito));
   }
@@ -40,12 +50,13 @@ export class MotorDeRegata {
     return this.estado.naves.findIndex((n) => n.jugador);
   }
 
-  /** [R-601] Avanza el tiempo real `dt` en pasos fijos de `PASO`. */
+  /** [R-601] [K-101] Avanza el tiempo real `dt` —`ritmo·dt` de simulación— en pasos fijos de `PASO`. */
   tictac(dt: number, mando: Mando): void {
     if (this.estado.terminada) return;
-    this.acumulado += Math.min(dt, TOPE_PASOS * PASO);
+    const tope = Math.ceil(TOPE_PASOS * this.ritmo);
+    this.acumulado += Math.min(dt * this.ritmo, tope * PASO);
     let pasos = 0;
-    while (this.acumulado >= PASO && pasos < TOPE_PASOS && !this.estado.terminada) {
+    while (this.acumulado >= PASO && pasos < tope && !this.estado.terminada) {
       const jugador = this.estado.naves[this.jugador];
       const ultimaVuelta = jugador !== undefined && jugador.vuelta >= this.estado.circuito.vueltas - 1;
       this.estado = avanzar(this.estado, { mando, ultimaVuelta }, this.rng);

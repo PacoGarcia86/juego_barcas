@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | SPEC-006 |
 | **Título** | Una regata dura tres minutos y pasa algo cada pocos segundos, sin romper el compromiso de los cascos |
-| **Estado** | 📋 `BORRADOR` |
+| **Estado** | 🚧 `EN CURSO` (aprobada 2026-09-23 · Fase K1) |
 | **Autor** | — |
 | **Creado** | 2026-09-23 |
 | **Módulos afectados** | `src/engine/{carrera,huevos,ia,objetos}.ts`, `src/engine/datos/circuitos.ts`, `src/juego/motor.ts`, `src/render/tresd/vista.ts`, `src/components/{Tablero,Mando}.tsx`, `scripts/` |
@@ -141,21 +141,21 @@ sabe que existe un segundo real (`B-902`, `B-903`).
 
 | ID | Requisito | Aceptación |
 |---|---|---|
-| **K-001** | `npm run diversion` corre las 32 regatas del baseline y, por circuito y en total, imprime: duración real, velocidad media de la flota en m/s reales, hueco máximo sin acontecimiento, adelantamientos ganados y sufridos por minuto (histéresis `B-702`), objetos por minuto, y la ventaja del piloto experto sobre el medio. Sale con código ≠ 0 si incumple KG1–KG5 | Se ejecuta en la fase K1 **antes** de cambiar nada y reproduce las cifras de §3 (±5 %). Test `[K-001]` sobre una regata corta: el hueco máximo es ≥ 0 y ≤ la duración |
+| **K-001** | `npm run diversion` corre las 32 regatas del baseline y, por circuito y en total, imprime: duración real, velocidad media de la flota en m/s reales, hueco máximo sin acontecimiento, adelantamientos ganados y sufridos por minuto (histéresis `B-702`), objetos por minuto, y —desde K2— la ventaja del piloto experto sobre el medio. `--fase K1` exige solo los objetivos de esa fase (KG1, KG2); sin `--fase`, todos los que ya se pueden medir. Sale con código ≠ 0 si incumple alguno. `--original` corre con `RITMO` 1 y la copia de los circuitos de antes del recorte (`scripts/circuitos-originales.ts`) | `--original` reproduce las cifras de §3 (±5 %). Test `[K-001]` sobre una regata corta: el hueco máximo es ≥ 0 y ≤ la duración |
 
 ### K-1xx · Ritmo
 
 | ID | Requisito | Aceptación |
 |---|---|---|
-| **K-101** | `RITMO` (valor inicial **2,0**, dato en `ritmo.ts`) es cuántos segundos de simulación avanza la costura por segundo real. `fisica.ts` no cambia; el agua de Gerstner y el cielo siguen en tiempo real para que el mar no se vea acelerado | Test `[K-101]`: con la misma semilla, la secuencia de estados del motor es **idéntica** con cualquier `RITMO` (el ritmo solo cambia cuántos pasos por fotograma). `git diff` de la fase no toca `fisica.ts`. `realismo.test.ts` sigue en verde sin tocarlo |
-| **K-102** | Las vueltas y las longitudes de tramo de los cuatro circuitos se recortan hasta cumplir KG1. Se escalan **longitud y radio del mismo tramo por el mismo factor**, para que la vuelta siga cerrando (`R-105`) y el reparto de `B-102` se mantenga | Test `[K-102]`: cada circuito cierra (Σ longitud/radio = ±2π, el test de `R-105` sigue en verde); la proporción de cada tipo de tramo en la vuelta cambia menos de 5 puntos. `npm run diversion`: KG1 |
-| **K-103** | Los tiempos que el jugador tiene que *leer* —cuenta atrás, avisos, el indicador del objeto— van en segundos reales, no de simulación | Test `[K-103]`: la cuenta atrás dura 3 s reales con `RITMO` 1 y con `RITMO` 2 |
+| **K-101** | `RITMO` (valor inicial **2,0**; **3** tras la medición de K1, ver «Lo que la medición cambió»; dato en `ritmo.ts`) es cuántos segundos de simulación avanza la costura por segundo real. `fisica.ts` no cambia; el agua de Gerstner y el cielo siguen en tiempo real para que el mar no se vea acelerado | Test `[K-101]`: con la misma semilla, la secuencia de estados del motor es **idéntica** con cualquier `RITMO` (el ritmo solo cambia cuántos pasos por fotograma). `git diff` de la fase no toca `fisica.ts`. `realismo.test.ts` sigue en verde sin tocarlo |
+| **K-102** | **Se recortan las vueltas, no la geometría.** Los cuatro circuitos se corren a **2 vueltas** y sus tramos no cambian ni un metro. La primera versión escalaba longitud y radio, y la medición la tumbó: con las curvas más cerradas o las rectas más cortas, `B-202` se rompe (ver «Lo que la medición cambió») | Test `[K-102]`: los cuatro circuitos declaran 2 vueltas y sus tramos son idénticos, uno a uno, a los de `scripts/circuitos-originales.ts`. `npm run diversion`: KG1. `npm run baseline`: KG6 |
+| **K-103** | Los tiempos que el jugador tiene que *leer* —cuenta atrás, avisos, el indicador del objeto— van en segundos reales, no de simulación Test `[K-103]`: `segundosReales(s)` de `ritmo.ts` vale `s / RITMO`; los tiempos que enseñan hoy la pantalla —lo que le queda a un efecto (`Aliento.tsx`) y el tiempo final (`RegataMode.tsx`)— pasan por ella. La cuenta atrás de `K-202` se prueba con el mismo criterio en K2 |
 
 ### K-2xx · Acción
 
 | ID | Requisito | Aceptación |
 |---|---|---|
-| **K-201** | **Reescribe `H-102`** (se edita SPEC-002 al abrir la fase K2): las filas de huevos se reparten para que, a la velocidad de crucero media del circuito, pase **una fila cada 8–10 s reales**. La fila sigue saliendo del circuito, no de una lista a mano, y sigue sin costar nada (`H-101`) | Test `[K-201]`: para cada circuito, `longitudDeVuelta / filas / vCrucero / RITMO` cae en `[8, 10]`. `npm run objetos-audit` sigue en verde. `npm run diversion`: KG3 |
+| **K-201** | **Reescribe `H-102`** (SPEC-002, editado en la fase K1): una fila de huevos cada **~110 m** en vez de cada 180. A la velocidad media del baseline (4,1–4,75 m/s) y `RITMO` 3, es una fila cada **7,7–8,9 s reales**. La fila sigue saliendo del circuito, no de una lista a mano, y sigue sin costar nada (`H-101`). **Se adelanta a K1**: con 2 vueltas (`K-102`) la regata trae menos filas y `HG3` (≥ 12 huevos por regata, puerta de `objetos-audit` en CI) caía a 10 | Test `[K-201]`: para cada circuito, `longitudDeVuelta / filas` cae en `[100, 120]` m y, dividido por 4,4 m/s y por `RITMO`, en `[7, 10]` s reales. `npm run objetos-audit` en verde. `npm run diversion`: KG3 (en K2) |
 | **K-202** | **Salida con cuenta atrás.** La regata empieza con 3 s de cuenta atrás en los que nadie avanza. Pedir gas a tope en los últimos 0,5 s da un turbo de salida (`H-201`, 1,5 s); pedirlo antes de eso, un ahogo de 1 s a media fuerza. Lo decide el motor a partir del mando, con el reloj de la regata | Tests `[K-202]`: gas a tope en `t = −0,3 s` ⇒ la nave sale con efecto `turbo`; en `t = −1,5 s` ⇒ con efecto `frenado`; sin tocar ⇒ sin efecto. Misma semilla ⇒ mismo resultado (`B-901`) |
 | **K-203** | **Ceñir la boya con miniturbo.** En un tramo `curva`, mantener el timón hacia el interior estando ya en el carril interior carga un medidor (hoy ese gesto no hace nada). Soltarlo con ≥ 0,8 s de carga da un turbo corto (0,6 s); con ≥ 1,6 s, uno largo (1,2 s). Mientras carga, la barca paga la penalización de viraje de `velocidadDeViraje` como si fuera 10 % más rápido: arriesgar cuesta | Tests `[K-203]`: carga de 1,0 s ⇒ turbo de 0,6 s; de 2,0 s ⇒ de 1,2 s; de 0,5 s ⇒ nada; fuera de curva o fuera del carril interior ⇒ el medidor no sube. KG5 con el piloto experto |
 | **K-204** | Las rivales también salen con turbo y ciñen, con probabilidad según su personalidad (`B-501`): la `lanzada` casi siempre, la `regular` a veces. Sin eso, el miniturbo es una ventaja que solo tiene el jugador y KG4 baja | `npm run baseline` en verde (KG6). Test `[K-204]`: sobre 20 salidas con semilla fija, cada personalidad clava la salida en la proporción declarada ± 15 puntos |
@@ -206,13 +206,14 @@ La suite completa sigue en verde. `npm run baseline` sigue pasando su puerta en 
 ## 7. Fases y puertas de salida
 
 ### Fase K1 — Arnés y ritmo
-**Alcance:** `K-001`, `K-101`, `K-102`, `K-103`
+**Alcance:** `K-001`, `K-101`, `K-102`, `K-103`, `K-201` (adelantado de K2, y la reescritura de
+`H-102` en SPEC-002 antes de tocar `huevos.ts`)
 **Puerta:** `npm run diversion` reproduce §3 con `--original` y, con el ritmo nuevo, cumple
-**KG1** y **KG2**. `npm run baseline` en verde (**KG6**). Lint, tests y build limpios.
+**KG1** y **KG2**. `npm run baseline` en verde (**KG6**). `npm run objetos-audit` en verde. Lint,
+tests y build limpios.
 
 ### Fase K2 — Acción
-**Alcance:** `K-201`, `K-202`, `K-203`, `K-204` (y la reescritura de `H-102` en SPEC-002 antes de
-tocar `huevos.ts`)
+**Alcance:** `K-202`, `K-203`, `K-204`
 **Puerta:** **KG3**, **KG4** y **KG5** en `npm run diversion`; **KG6** en `npm run baseline`;
 `npm run objetos-audit` en verde.
 
@@ -239,9 +240,23 @@ FOV en 76° y con turbo en 82°.
 
 | # | Pregunta | Bloquea |
 |---|---|---|
-| **KQ1** | ¿Acelerar el reloj (`K-101`, lo propuesto) o reescalar la física para que las barcas vayan de verdad a 9 m/s? Reescalar obliga a reescribir `B-202`, `B-203` y buena parte de `realismo.test.ts`, y los números de CLAUDE.md («una barca de 12 m alcanza 4,33 m/s») dejarían de ser ciertos. El reloj no toca nada de eso | K1 |
-| **KQ2** | ¿Tres vueltas cortas o dos largas? El kart usa tres; con tres, cada vuelta de la ría se queda en unos 500 m | K1 |
+| ~~**KQ1**~~ | **Resuelta 2026-09-23: acelerar el reloj (`K-101`).** ¿Acelerar el reloj (`K-101`, lo propuesto) o reescalar la física para que las barcas vayan de verdad a 9 m/s? Reescalar obliga a reescribir `B-202`, `B-203` y buena parte de `realismo.test.ts`, y los números de CLAUDE.md («una barca de 12 m alcanza 4,33 m/s») dejarían de ser ciertos. El reloj no toca nada de eso | K1 |
+| ~~**KQ2**~~ | **Resuelta 2026-09-23: tres vueltas cortas, también en Punta Tormenta (hoy 2).** ¿Tres vueltas cortas o dos largas? El kart usa tres; con tres, cada vuelta de la ría se queda en unos 500 m | K1 |
 | **KQ3** | ¿Mostrar la velocidad en el tablero (nudos o km/h)? Ayuda a sentirla, pero sería la velocidad de pantalla, no la del motor | K3 |
+
+---
+
+## Lo que la medición cambió respecto a lo escrito
+
+Se escribe según se mide, no al cerrar: el texto de `K-101` y `K-102` ya remite aquí.
+
+| Requisito | Lo que decía la especificación | Lo que dijo la medición (2026-09-23, `npm run baseline` + `npm run diversion`) |
+|---|---|---|
+| `K-102` | «Se escalan longitud y radio del mismo tramo por el mismo factor, para que el reparto se mantenga» | **Falso: el radio decide `B-202`.** Con los cuatro circuitos escalados (0,53–0,66) y 3 vueltas, el **patín gana el 55–62 %** de sus plazas y **la trainera y la galeota, el 0 %**. Recortando solo las rectas y dejando las curvas, patín 40 % y **lancha y galeota a 0 %**: son barcas de recta y de planeo, y la recta es su terreno. Aislado con dos pruebas: la geometría original a **1 vuelta** mantiene el reparto (máx. 21 %), la geometría escalada a 0,6 con **5 vueltas** (misma distancia) lo rompe. **La duración de la regata no desequilibra; la forma del circuito sí.** Se recortan las vueltas y no se toca un tramo |
+| `KQ2` | Resuelta: «tres vueltas cortas» | **No se puede cumplir sin romper el astillero.** Con la geometría intacta y 3 vueltas, KG1 pide `RITMO` 4 y aun así da **4,3 min** de mediana (falla) a 60 km/h de pantalla. Con **2 vueltas y `RITMO` 3**: 3,7 min, 12–13 m/s de pantalla, victoria más alta 21 %. Se corren 2 vueltas |
+| `K-101` | `RITMO` inicial 2,0 | **3.** Con 2 vueltas de la geometría original, `RITMO` 2 deja la regata en 5,6 min de mediana (aritmética, no estimación: la regata es idéntica a cualquier ritmo, `K-101`, así que son los 3,7 min × 3/2) |
+| `K-201` | Fase K2 | **Se adelanta a K1.** Con 2 vueltas, `HG3` (≥ 12 huevos por regata, puerta de CI) caía a **10**. Con filas cada 110 m: **13** en `objetos-audit`, y el hueco sin acontecimiento baja de 47 s a **10 s** de mediana, con lo que KG3 ya se cumple en K1 |
+| `DK5` | 0,44 adelantamientos sufridos por minuto | Es la cifra del baseline (parrilla rotada). Con el muestreo de `K-001` (chalana sin tripulación) son **0,08 sufridos + 0,21 ganados = 0,29 por minuto**. KG4 se mide con este último |
 
 ---
 
@@ -283,7 +298,7 @@ export function fovPara(vPantalla: number, vCascoPantalla: number, turbo: boolea
 |---|---|---|---|---|
 | DK1 · 12,4 min por regata | K-101, K-102 | K1 | 📋 | `[K-102]` · `npm run diversion` |
 | DK2 · 4,1–4,8 m/s | K-101 | K1 | 📋 | `[K-101]` · `npm run diversion` |
-| DK3 · 47 s sin que pase nada | K-201, K-202, K-203 | K2 | 📋 | `[K-201]` · `npm run diversion` |
-| DK4 · 1,39 objetos/min | K-201 | K2 | 📋 | `[K-201]` · `npm run objetos-audit` |
+| DK3 · 47 s sin que pase nada | K-201, K-202, K-203 | K1/K2 | 📋 | `[K-201]` · `npm run diversion` |
+| DK4 · 1,39 objetos/min | K-201 | K1 | 📋 | `[K-201]` · `npm run objetos-audit` |
 | DK5 · 0,44 adelantamientos/min | K-203, K-204, K-303 | K2/K3 | 📋 | `npm run diversion` |
 | DK6 · FOV nunca pasa de 72° | K-301 | K3 | 📋 | `[K-301]` |

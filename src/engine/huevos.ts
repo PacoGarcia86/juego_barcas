@@ -14,8 +14,15 @@ import { elegirPonderado } from './rng.ts';
 import { carrilesEn, longitudDeVuelta, puntoDe } from './circuito.ts';
 import { pesosDePlaza, TIPOS } from './objetos.ts';
 
-/** [H-102] Metros entre una fila de huevos y la siguiente. */
-const PASO_ENTRE_FILAS = 180;
+/**
+ * [H-102] [K-201] Metros entre una fila de huevos y la siguiente.
+ *
+ * Eran 180: a 4,3 m/s, una fila cada 42 s, y medio minuto largo manteniendo el
+ * carril sin decidir nada (SPEC-006 `DK3`). Con 110 m y el `RITMO` de pantalla
+ * es una cada 8–9 s reales, y la regata de dos vueltas (`K-102`) sigue trayendo
+ * los huevos que promete `HG3`.
+ */
+export const PASO_ENTRE_FILAS = 110;
 /**
  * [H-102] Huevos por fila, como mucho.
  *
@@ -49,12 +56,13 @@ export const REAPARICION = 2;
  * [H-102] Los huevos salen del circuito, no de una lista escrita a mano: si
  * mañana un tramo cambia de longitud, las filas se recolocan solas.
  *
- * Una fila cada 180 m, con un huevo por carril hasta cinco. En un estrecho de
- * dos carriles hay dos huevos, no cinco flotando sobre la orilla.
+ * Una fila cada `PASO_ENTRE_FILAS` m, con un huevo por carril hasta cinco. En
+ * un estrecho de dos carriles hay dos huevos, no cinco flotando sobre la orilla.
  */
 export function huevosDe(circuito: Circuito): Huevo[] {
   const vuelta = longitudDeVuelta(circuito);
-  const filas = Math.max(1, Math.round(vuelta / PASO_ENTRE_FILAS));
+  // Por exceso: el paso real nunca pasa de `PASO_ENTRE_FILAS` [K-201].
+  const filas = Math.max(1, Math.ceil(vuelta / PASO_ENTRE_FILAS));
   const huevos: Huevo[] = [];
   for (let i = 0; i < filas; i++) {
     // Se desplaza media fila para no poner una justo en la línea de meta.
