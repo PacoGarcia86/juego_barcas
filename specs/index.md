@@ -1,6 +1,6 @@
 # Especificaciones — Índice y enrutado
 
-**Actualizado:** 2026-09-16
+**Actualizado:** 2026-09-23
 
 Este fichero es el punto de entrada. **Lee esto primero y carga solo la sección a la que te
 enrute**, no el documento entero. El flujo de trabajo está en [`WORKFLOW.md`](WORKFLOW.md).
@@ -39,6 +39,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | **El agua: olas de Gerstner, espuma, estela** | `004` §5 `R-2xx` — **§1.1 primero**: por qué no es un plano con una normal map |
 | Malla de la barca, cabeceo, balanceo, remos | `004` §5 `R-3xx` |
 | Cielo, costa, islas, boyas, niebla | `004` §5 `R-4xx` |
+| **Aspecto: reflejos, espuma, resplandor, sombras, post-proceso** | `004` §5 `R-206`–`R-209` · `R-505`/`R-506` · §3 `DR8`–`DR12` |
 | **Cámara, luz, encuadre** | `004` §5 `R-5xx` — **`R-501` antes de tocar el encuadre** |
 | Bucle de dibujo, rendimiento, `?diagnostico=1` | `004` §5 `R-6xx` |
 | Guardar la partida, migración, almacenamiento bloqueado | `005` §5 `P-1xx` |
@@ -57,7 +58,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | [SPEC-001](001-motor-de-regata.md) | El motor de regata | `B-` | ✅ COMPLETADA (Fases B1 y B2) |
 | [SPEC-002](002-huevos-y-objetos.md) | Los huevos y los objetos | `H-` | ✅ COMPLETADA (Fase H1) |
 | [SPEC-003](003-astillero-y-tripulacion.md) | El astillero y la tripulación | `A-` | ✅ COMPLETADA (Fase A1) |
-| [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fase R1) |
+| [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1 y R2) |
 | [SPEC-005](005-progreso-y-despliegue.md) | Progreso, aplicación y despliegue | `P-` | ✅ COMPLETADA (Fase P1) |
 
 ---

@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | SPEC-004 |
 | **Título** | El agua se mueve, la barca cabecea sobre ella y la cámara mira por donde va el circuito |
-| **Estado** | ✅ `COMPLETADA` (Fase R1) |
+| **Estado** | ✅ `COMPLETADA` (Fases R1 y R2) |
 | **Autor** | — |
 | **Creado** | 2026-09-16 |
 | **Módulos afectados** | `src/render/**`, `src/juego/motor.ts`, `src/components/Lienzo.tsx` |
@@ -76,6 +76,16 @@ sobra. **No vuelvas a proponerlo sin traer una medición de tiempo de carga en 4
 | **DR6** | `trazado.ts` | El error de cierre se repartía MOVIENDO los puntos | `faro` declara 1 380 m de vuelta y la polilínea medía **1 037 m**: el mundo encogido un 25 %, y desigualmente —22 m del motor eran 9,2 m en un sitio y 28,9 m en otro | La cámara se coloca «22 m por detrás» y acababa **dentro** de la barca del jugador. El test de `R-101` estaba en verde: la polilínea cerraba con menos de metro y medio |
 | **DR7** | `datos/circuitos.ts` | Las curvas de un circuito no sumaban una vuelta | `faro`: giro total **−0,24 rad** de los 6,28 que hacen falta. `ria`: 3,07 | Ningún arreglo de cierre podía salvarlos: no eran circuitos, eran caminos |
 
+**Auditoría visual 2026-09-23** (capturas de los cuatro circuitos a 1280×720, 7 s de regata):
+
+| ID | Fichero | Defecto | Medición | Consecuencia |
+|---|---|---|---|---|
+| **DR8** | `flota.ts` | Los puntos de estela sin usar se mandaban a `y = −9999` y la tira los seguía uniendo con los buenos | Un triángulo blanco de **~150 px** cruzando la esquina inferior en `ria`, desde el primer segundo | Parecía un fallo de la tarjeta gráfica, no espuma |
+| **DR9** | `agua.ts` | La espuma salía de la altura de la ola, sin más | Manchas blancas de **20–40 m** en `tormenta` y `faro`, lisas y con borde de degradado | Se leía como nieve flotando, no como crestas rompiendo |
+| **DR10** | `agua.ts` | El agua no llevaba niebla y el borde de la malla cortaba contra el cielo | Una raya dura en el horizonte en los 4 circuitos; las islas, sí con niebla, salían **más claras que el agua** que tenían delante | El mundo se acababa a 420 m y se notaba |
+| **DR11** | `mundo.ts` | La cámara de sombras era la de serie (±5 m alrededor del origen) y `PCFSoftShadowMap` ya no existe en three 0.186 | **0** barcas con sombra fuera del origen; un aviso en la consola en cada regata | Las sombras costaban un pase de dibujo y no se veían |
+| **DR12** | `mundo.ts` | Islas = dos icosaedros (roca y un capuchón verde) | Siluetas de globo; con la niebla lineal a **219 m** en `faro`, todas del mismo azul claro | No se leía costa, se leían manchas |
+
 ---
 
 ## 4. Arquitectura objetivo
@@ -120,6 +130,10 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | **R-203** | La amplitud de las olas la fija `oleajeEn` del circuito (`B-107`), no una constante del render: con `oleaje 0` el agua está casi plana | Con `oleaje 0` la amplitud total < 0,12 m; con `oleaje 1`, > 0,55 m |
 | **R-204** | **Espuma en las crestas** y **estela detrás de cada barca**: una tira de geometría que se alarga con la velocidad y se desvanece en 3 s | Parado, la estela mide < 2 m; a 5 m/s, > 14 m |
 | **R-205** | El color del agua va por profundidad aproximada y Fresnel contra el cielo, no por un color plano | — |
+| **R-206** | **Detalle y reflejo por píxel.** Encima de la malla de Gerstner, el sombreador de fragmentos suma rizos pequeños procedurales (sin textura que descargar) a la normal, refleja **el mismo cielo que se dibuja** (`R-406`) con Fresnel de Schlick y pone el brillo del sol con la dirección de la luz de la paleta, no una constante | Test estático: el sombreador del agua recibe `direccionSol` como uniforme y no declara una dirección de luz propia |
+| **R-207** | **El agua lleva niebla** y funde con el horizonte del cielo (`DR10`): el color de la niebla del agua, la de la escena y el pie del cielo es el mismo de la paleta | Test: la niebla de la escena y el uniforme de niebla del agua salen del mismo campo de la paleta |
+| **R-208** | **La espuma se rompe** (`DR9`): sale de la altura de la cresta **multiplicada por un ruido** que se mueve con el agua, no de un umbral liso de altura | — (se mira en la captura: §6.3) |
+| **R-209** | **La estela no se estira al vacío** (`DR8`): un punto sin rastro se pliega sobre el último punto bueno de su barca; la tira tiene borde suave y ruido de espuma | Test: tras 3 s de regata ningún vértice de la estela está a más de 30 m de su barca ni por debajo de −3 m |
 
 ### R-3xx · Las barcas
 
@@ -130,6 +144,8 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | **R-303** | La malla del casco es procedural y sale de la `eslora`, la `manga` y el `casco` de la barca: una traiñera de 14 m se ve larga y estrecha; una neumática, corta y ancha | La relación eslora/manga de la malla coincide con la del dato ± 5 % |
 | **R-304** | Los remos se mueven con la fracción de empuje, no con el reloj: a empuje 0 están quietos | — |
 | **R-305** | El casco se hunde con el desplazamiento: una barca con 5 tripulantes va más metida en el agua | El calado de la malla crece con `masa` |
+| **R-306** | **El casco tiene tres zonas de color**: obra viva con el color del casco, una **franja** en la borda con el color `franja` de la barca y la **cubierta de madera**. Sin mallas nuevas: una marca por vértice y el color de franja por instancia | Test: la geometría del casco marca borda y cubierta, y la flota sigue en ≤ 6 llamadas (`R-302`) |
+| **R-307** | **Se ve quién rema**: un remero por bancada con la camiseta del color `franja`, que se inclina con la boga (`R-304`), y remos con **pala**. Todos los remeros de las ocho barcas van en una sola malla instanciada | La flota entera sigue en **≤ 6 llamadas de dibujo** (`R-302`) |
 
 ### R-4xx · El mundo
 
@@ -140,6 +156,9 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | **R-403** | Los huevos se dibujan flotando y bobean con el agua; un huevo roto (`H-105`) no se dibuja | El número de huevos dibujados coincide con los no rotos del estado |
 | **R-404** | Costa e islas con volumen, colocadas a partir de la semilla del circuito (`B-901`): mismo circuito ⇒ misma costa | Dos construcciones del mismo circuito dan las mismas posiciones |
 | **R-405** | La niebla del objeto `niebla` (`H-206`) empaña la pantalla del jugador mientras dura el efecto, leyéndolo del estado | — |
+| **R-406** | **El cielo es un sombreador**, no una esfera con color por vértice: degradado de la paleta, **disco y halo del sol** en la dirección de la luz, **nubes** procedurales que se mueven y **estrellas** de noche. La función de cielo es una sola y la usa también el reflejo del agua (`R-206`) | Test: el trozo de GLSL del cielo se declara una vez y lo incluyen el cielo y el agua |
+| **R-407** | **Costa con relieve** (`DR12`): cada isla es un montículo con ruido, con **playa, verde y roca** por altura, y **pinos** encima. Sigue saliendo de la semilla del circuito (`R-404`) y en pocas llamadas: una malla instanciada para las islas y otra para los pinos | Dos construcciones del mismo circuito dan las mismas matrices (`R-404`) |
+| **R-408** | Las boyas llevan **franjas** y una **luz** en el tope que se ve de noche; los huevos son **ovoides** y brillan | — |
 
 ### R-5xx · La vista
 
@@ -149,6 +168,8 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 | **R-502** | El suavizado de la cámara va en **tiempo de regata**, no de reloj: a cámara lenta o acelerada el encuadre es el mismo | — |
 | **R-503** | La velocidad abre el campo de visión: de 62° parado a 76° a 8 m/s | — |
 | **R-504** | `vista.ts` es el único fichero que toca el `WebGLRenderer` y el lienzo | Test estático |
+| **R-505** | **Post-proceso en HDR**: se dibuja a un objetivo de coma flotante con MSAA, **resplandor** (*bloom*) sobre lo que pasa de 1 —el sol, sus brillos en el agua, los huevos y las luces de las boyas—, viñeta, y el mapeo de tonos y el paso a sRGB **al final, una sola vez**. Por eso los colores de la paleta entran en los sombreadores **en lineal** | Test estático: `vista.ts` monta el compositor y `simplificar` lo apaga (`R-603`) |
+| **R-506** | **Las sombras siguen a la barca seguida** (`DR11`): la cámara de sombras es una caja de ±45 m centrada en ella y la luz se mueve con ella en la dirección del sol | — (se mira en la captura) |
 
 ### R-6xx · El bucle
 
@@ -156,7 +177,7 @@ que `B-105`: la posición se calcula una vez, en el motor; el trazado solo la co
 |---|---|---|
 | **R-601** | El motor avanza a **paso fijo de 0,05 s** con acumulador; el render dibuja a la frecuencia del navegador e interpola. Un fotograma lento no cambia la regata (`B-901`) | Test: 100 ticks de 0,05 s dan el mismo estado que un `avanzar` llamado con dt variables que sumen lo mismo |
 | **R-602** | `?diagnostico=1` enseña fps, llamadas de dibujo, vértices y triángulos | — |
-| **R-603** | Si el fotograma medio pasa de 30 ms durante 60 fotogramas, se baja la resolución de la malla del agua y se apaga la espuma. **Se declara en pantalla**, no en silencio | — |
+| **R-603** | Si el fotograma medio pasa de 30 ms durante 60 fotogramas, se baja la resolución de la malla del agua y se apaga la espuma. **Se declara en pantalla**, no en silencio. Desde la Fase R2 también se apagan el resplandor (`R-505`) y las sombras (`R-506`) | — |
 
 ---
 
@@ -216,6 +237,37 @@ circuitos abiertos en Chromium, sin un solo error de consola.
 dibuja por software (SwiftShader), no con la tarjeta gráfica. Lo que sí vale de ahí son las
 llamadas de dibujo, los triángulos y —sobre todo— lo que se ve.
 
+### Fase R2 — Que se vea como un juego de 2026 · ✅ **CERRADA 2026-09-23**
+**Alcance:** `R-206` – `R-209`, `R-306`, `R-307`, `R-406` – `R-408`, `R-505`, `R-506`; y `R-603` ampliado
+**Puerta:** los tests de siempre en verde más los nuevos; la flota **sigue en ≤ 6 llamadas**; la malla
+del agua **sigue en ≤ 90 000 vértices**; los cuatro circuitos abiertos en Chromium sin errores ni
+avisos de consola, y **las capturas antes/después miradas** (`§6.3`): ni triángulo de estela, ni
+manchas de espuma, ni raya en el horizonte.
+**Resultado:** 159 tests en verde (10 nuevos en `render-aspecto.test.ts`) · `tsc --noEmit` limpio ·
+`vite build` correcto · los cuatro circuitos abiertos en Chromium sin un error ni un aviso de consola.
+
+| Comprobación | Resultado |
+|---|---|
+| `R-302` · mallas de la flota, con remeros | **6** (umbral ≤ 6) |
+| `R-202` · vértices de la malla del agua | **14 081**, sin cambio (tope 90 000) |
+| `R-209` · vértices de estela lejos de su barca tras 3 s | **0** (antes: la mitad de la tira a y = −9999) |
+| `R-209` · largo de la estela a más de 2,5 m/s | **> 14 m** (antes: 0,4 s de estela, unos 2 m) |
+| `R-407` · islas dentro del agua navegable, 4 circuitos | **0** |
+| Llamadas de dibujo, escena completa | **35** (antes 15): el resplandor son ~10 pases a pantalla completa y la sombra, uno más. La flota sigue en 6 |
+| Triángulos por fotograma | **134 k – 156 k** (antes 57 k – 59 k): el pase de sombras y las islas con relieve. Las islas no echan sombra, que costaba 70 k más |
+| Paquete de la aplicación | **233,9 KB** comprimido (antes 225,2): +8,7 KB. Ni una textura ni un modelo que descargar (`§1.2`) |
+| `DR8` – `DR12` en captura | Sin triángulo de estela, sin manchas de espuma, sin raya en el horizonte, sombras en la flota, islas con playa, verde, roca y pinos |
+
+**Lo que la medición cambió:** la primera espuma nueva (umbral de cresta + ruido) **seguía haciendo
+manchas** en `faro` y `tormenta`: con la cresta alta, el ruido pasaba el umbral en todas partes. Lo
+que funcionó fue lo contrario: que la cresta BAJE el umbral del ruido, y que sin cresta no haya
+espuma. La estela también salió demasiado ancha la primera vez (hasta 1,8 mangas por lado: una
+chalana dejaba una mancha de 7 m); se quedó en 1,1. Y al mirar las capturas salieron dos defectos que
+ningún test veía: **las barcas cabeceaban al revés que la ola** (el giro en X baja la proa y
+`cabeceo` es positivo con la proa arriba) y **los huevos y las boyas se colocaban con el ángulo del
+punto visto desde el origen**, no con el rumbo del circuito: ahora usan `posicionEn`, la misma cuenta
+que las barcas (`R-402`).
+
 ---
 
 ## 8. Riesgos
@@ -264,3 +316,8 @@ export function alturaDeOla(x: number, z: number, t: number, oleaje: number): nu
 | DR5 · distancia duplicada | `R-102` | R1 | ✅ | `[R-102] el trazado cierra` |
 | DR6 · mundo encogido un 25 % | `R-106` | R1 | ✅ | `[R-106] un metro del motor es un metro del mundo` |
 | DR7 · circuitos que no giran una vuelta | `R-105` | R1 | ✅ | `[R-105] un circuito cerrado gira una vuelta entera` |
+| DR8 · triángulo de estela al vacío | `R-209` | R2 | ✅ | `[R-209] la estela no se estira al vacío` |
+| DR9 · espuma en manchas | `R-208` | R2 | ✅ | captura (§6.3) |
+| DR10 · raya en el horizonte | `R-207` | R2 | ✅ | `[R-207] el agua, la escena y el cielo comparten niebla` |
+| DR11 · sombras en el origen | `R-506` | R2 | ✅ | captura (§6.3) |
+| DR12 · islas de globo | `R-407` | R2 | ✅ | `[R-404] mismo circuito, misma costa` |
