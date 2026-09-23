@@ -44,6 +44,12 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | Guardar la partida, migración, almacenamiento bloqueado | `005` §5 `P-1xx` |
 | Instalar en Android e iOS, manifiesto, iconos | `005` §5 `P-2xx` |
 | Despliegue en Firebase Hosting, caché, integración continua | `005` §5 `P-3xx` + [`../DEPLOYMENT.md`](../DEPLOYMENT.md) |
+| **Ritmo de kart: por qué la regata va más rápida sin tocar la física** (reloj de juego, `RITMO`) | `006` §4 · §5 `K-101` — **léelo antes de cambiar velocidades o duraciones** |
+| Duración de la regata, longitud de los circuitos recortados | `006` §5 `K-102` · §3 `DK1` |
+| Cada cuánto pasa algo: cadencia de huevos, hueco sin acontecimiento | `006` §5 `K-201` · §3 `DK3`/`DK4` |
+| Salida con cuenta atrás y miniturbo al ceñir la boya | `006` §5 `K-202`–`K-204` |
+| FOV de velocidad, avisos de adelantamiento en pantalla | `006` §5 `K-3xx` |
+| Arnés de diversión (`npm run diversion`) | `006` §5 `K-001` · §2 `KG1`–`KG6` |
 
 **Si tu tarea no aparece aquí**, no improvises: sigue el *Protocolo de nueva especificación* de
 [`WORKFLOW.md`](WORKFLOW.md) §2.
@@ -59,6 +65,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | [SPEC-003](003-astillero-y-tripulacion.md) | El astillero y la tripulación | `A-` | ✅ COMPLETADA (Fase A1) |
 | [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1 y R2) |
 | [SPEC-005](005-progreso-y-despliegue.md) | Progreso, aplicación y despliegue | `P-` | ✅ COMPLETADA (Fase P1) |
+| [SPEC-006](006-ritmo-de-kart.md) | Ritmo de kart | `K-` | 📋 BORRADOR |
 
 ---
 
@@ -73,8 +80,9 @@ Un prefijo por documento, para que un `grep '\[B-2'` no cruce especificaciones.
 | `A-` | SPEC-003 · astillero y tripulación |
 | `R-` | SPEC-004 · render del agua |
 | `P-` | SPEC-005 · progreso y despliegue |
+| `K-` | SPEC-006 · ritmo de kart |
 
-**Libres:** `C-` `D-` `E-` `F-` `G-` `I-` `J-` `K-` `L-` `M-` `N-` `O-` `Q-` `S-` `T-` `U-` `V-`
+**Libres:** `C-` `D-` `E-` `F-` `G-` `I-` `J-` `L-` `M-` `N-` `O-` `Q-` `S-` `T-` `U-` `V-`
 `W-` `X-` `Y-` `Z-`.
 
 ---
