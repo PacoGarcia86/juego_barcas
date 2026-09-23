@@ -245,6 +245,19 @@ export interface Nave {
   tiempoMeta: number | null;
 }
 
+/**
+ * [K-303] Algo que le ha pasado al jugador en un tick. `quien` es índice de nave.
+ * `golpe` no dice qué objeto fue: el impacto no lo sabe.
+ */
+export type Aviso =
+  | { tipo: 'teAdelantan'; quien: number }
+  | { tipo: 'adelantas'; quien: number }
+  | { tipo: 'huevo' }
+  | { tipo: 'usas'; objeto: TipoObjeto }
+  | { tipo: 'golpe' }
+  | { tipo: 'ahogo' }
+  | { tipo: 'turbo'; origen: 'salida' | 'cenir' | 'objeto' };
+
 export interface EstadoRegata {
   circuito: Circuito;
   naves: Nave[];
@@ -268,6 +281,12 @@ export interface EstadoRegata {
    * y entonces pueden volver a adelantar y volver a contar.
    */
   delante: number[];
+  /** [K-303] En espejo de `delante`: rivales ya consolidadas DETRÁS del jugador. */
+  detras: number[];
+  /** [K-303] Candidatas a adelantamiento ganado, con la misma histéresis de `B-702`. */
+  pendientesDetras: { indice: number; desde: number }[];
+  /** [K-303] Lo que le ha pasado al jugador en el ÚLTIMO tick. La costura los acumula. */
+  avisos: Aviso[];
   terminada: boolean;
   proximoObjeto: number;
 }

@@ -118,7 +118,8 @@ src/engine/
   ritmo.ts          NUEVO. RITMO: segundos de simulación por segundo real (K-101). Puro, un dato
 src/juego/motor.ts  avanza RITMO·dt de simulación por dt real (K-101)
 src/render/tresd/
-  vista.ts          FOV por velocidad en pantalla, no por 8 m/s escrito a mano (K-301)
+  encuadre.ts       NUEVO. fovPara(): FOV por velocidad en pantalla. Puro, sin three (K-301)
+  vista.ts          usa fovPara, no 8 m/s escrito a mano (K-301)
 src/components/
   Tablero.tsx       cuenta atrás y avisos de adelantamiento (K-302, K-303)
   Mando.tsx         sin cambios de controles: el miniturbo usa el timón que ya existe (K-203)
@@ -141,7 +142,7 @@ sabe que existe un segundo real (`B-902`, `B-903`).
 
 | ID | Requisito | Aceptación |
 |---|---|---|
-| **K-001** | `npm run diversion` corre las 32 regatas del baseline y, por circuito y en total, imprime: duración real, velocidad media de la flota en m/s reales, hueco máximo sin acontecimiento, adelantamientos ganados y sufridos por minuto (histéresis `B-702`), objetos por minuto, y —desde K2— la ventaja del piloto experto sobre el medio. `--fase K1` exige solo los objetivos de esa fase (KG1, KG2); sin `--fase`, todos los que ya se pueden medir. Sale con código ≠ 0 si incumple alguno. `--original` corre con `RITMO` 1 y la copia de los circuitos de antes del recorte (`scripts/circuitos-originales.ts`) | `--original` reproduce las cifras de §3 (±5 %). Test `[K-001]` sobre una regata corta: el hueco máximo es ≥ 0 y ≤ la duración |
+| **K-001** | `npm run diversion` corre las 32 regatas del baseline y, por circuito y en total, imprime: duración real, velocidad media de la flota en m/s reales, hueco máximo sin acontecimiento, adelantamientos ganados y sufridos por minuto (histéresis `B-702`), objetos por minuto, y —desde K2— la ventaja del piloto experto sobre el medio. `--fase K1` exige solo los objetivos de esa fase (KG1, KG2); sin `--fase`, todos los que ya se pueden medir. Sale con código ≠ 0 si incumple alguno. `--original` corre con `RITMO` 1 y la copia de los circuitos de antes del recorte (`scripts/circuitos-originales.ts`), **con los huevos de hoy** | `--original` reproducía §3 (±5 %) hasta `K-201`; ver «Lo que la medición cambió». Test `[K-001]` sobre una regata corta: el hueco máximo es ≥ 0 y ≤ la duración |
 
 ### K-1xx · Ritmo
 
@@ -164,9 +165,9 @@ sabe que existe un segundo real (`B-902`, `B-903`).
 
 | ID | Requisito | Aceptación |
 |---|---|---|
-| **K-301** | El FOV se abre en función de la velocidad **en pantalla** (`velocidad · RITMO`) relativa a la velocidad de casco de la barca del jugador, no a 8 m/s escritos a mano. A velocidad de casco llega al FOV lanzado; con turbo lo supera hasta 82° | Test `[K-301]` sobre una función pura `fovPara(vPantalla, vCascoPantalla, turbo)`: devuelve 62° parado, 76° a velocidad de casco, 82° con turbo, y es monótona. `R-501` no se toca |
-| **K-302** | El tablero muestra la cuenta atrás (3 · 2 · 1 · ¡Ya!) y, si la salida fue buena, «¡Salida perfecta!». Sin unidades del motor (`H-3xx`) | Test `[K-302]` en el patrón de `higiene.test.ts`: los textos nuevos no contienen «N», «newtons» ni «empuje» |
-| **K-303** | El motor registra, por tick, los acontecimientos del jugador (adelantamiento ganado o sufrido ya consolidado, huevo roto, objeto recibido, turbo); el tablero muestra un aviso breve por cada uno («¡Te pasa la Lancha!», «¡Pasas a la Trainera!»). El mismo registro alimenta el hueco máximo de `K-001` | Test `[K-303]`: en una regata con semilla fija, el número de avisos de adelantamiento sufrido es igual a `adelantamientosSufridos` |
+| **K-301** | El FOV se abre en función de la velocidad **en pantalla** (`velocidad · RITMO`) relativa a la velocidad de casco de la barca del jugador, no a 8 m/s escritos a mano. A velocidad de casco llega al FOV lanzado; con turbo lo supera hasta 82° La función vive en `render/tresd/encuadre.ts`, pura y sin `three`; la vista recibe `ritmo` y la velocidad de casco del jugador desde arriba (`Lienzo`), porque el render solo importa **tipos** del motor (`H-209`). **Reescribe `R-503`** de SPEC-004 («76° a 8 m/s»). El panel `?diagnostico=1` (`R-602`) enseña el FOV del fotograma, para que la puerta de K3 se pueda comprobar en una captura | Test `[K-301]` sobre una función pura `fovPara(vPantalla, vCascoPantalla, turbo)`: devuelve 62° parado, 76° a velocidad de casco, 82° con turbo, y es monótona. `R-501` no se toca |
+| **K-302** | El tablero muestra la cuenta atrás (3 · 2 · 1 · ¡Ya!) y, si la salida fue buena, «¡Salida perfecta!»; si se ahogó, que se ahogó. Sin unidades del motor (`H-3xx`) | Test `[K-302]` en el patrón de `higiene.test.ts`: los textos nuevos no contienen «N», «newtons» ni «empuje» |
+| **K-303** | El motor registra, por tick, los acontecimientos del jugador en `est.avisos` (adelantamiento ganado o sufrido ya consolidado —los ganados con la misma histéresis de `B-702`—, huevo roto, objeto soltado, golpe recibido, turbo y de dónde viene, ahogo en la salida). La costura (`juego/motor.ts`) los acumula con la hora de la regata, porque React no pinta cada tick; el tablero enseña los recientes durante 2 s reales («¡Te pasa Lancha!», «¡Pasas a Trainera!»). El mismo registro alimenta el hueco máximo de `K-001` | Test `[K-303]`: en una regata con semilla fija, el número de avisos de adelantamiento sufrido es igual a `adelantamientosSufridos`, y el de huevos, a `huevosRotos` |
 
 ---
 
@@ -216,7 +217,7 @@ tests y build limpios.
 
 | Comprobación | Resultado |
 |---|---|
-| `K-001` · `diversion --original` contra §3 | **12,4 min · 47 s de hueco (peor 146) · 1,39 objetos/min**: idéntico a §3 |
+| `K-001` · `diversion --original` contra §3 | **12,4 min · 47 s de hueco (peor 146) · 1,39 objetos/min**: idéntico a §3. **Corrección (K3):** medido *antes* de aplicar `K-201`; con los huevos de ahora, `--original` ya no lo reproduce (ver «Lo que la medición cambió») |
 | `KG1` · duración de la regata | **3,7 min** de mediana (antes 12,4); peor circuito **3,9** (faro y tormenta). Umbral 2,5–4, peor ≤ 5 |
 | `KG2` · velocidad de la flota en pantalla | **12,05–12,99 m/s** (antes 4,0–4,4). Umbral ≥ 8 |
 | `KG3` · hueco sin acontecimiento (no exigido en K1) | **10 s** de mediana, peor **16 s** (antes 47 y 146). Ya dentro del umbral de K2 |
@@ -300,6 +301,7 @@ Se escribe según se mide, no al cerrar: el texto de `K-101` y `K-102` ya remite
 | `K-204` | `lanzada` y `sucia` ciñen todas sus curvas | Con el miniturbo ×6, las que ciñen se escapan: la mediana del 2.º pasa de 0,7 a **4,2 s** y KG4 cae a **1,09**. Que ciñan todas: **1,08**. Que no ciña ninguna: **1,58**. **Que ciñan solo por detrás del jugador: 1,80**, con el 2.º a 1,28 s y la victoria más alta en el 21 % |
 | `H-105` | No se tocaba | Se toca: con el grupo más apretado de K2, `HG3` cayó a **10 huevos** en `canal/1`. La reaparición pasa de 2 s a **1 s** de simulación (SPEC-002, «Lo que la medición cambió»): mínimo **17** |
 | `KG3` | «Peor ≤ 20 s» sobre las 32 regatas | **El máximo mide el sorteo.** Durante el ajuste de K2, 31 regatas quedaban en 8–21 s y una, `ria/3`, daba **27 s**: el piloto medio lleva un kraken en la mano al final de la regata, sin nadie a 55 m, así que ni lo suelta ni puede coger huevo (`H-103`). Es la lección de `B-704` y de `HG3` otra vez: se exige el **percentil 90**. Con K2 entero (incluida la reaparición de `H-105` a 1 s): mediana **10 s**, percentil 90 **11 s**, máximo **25 s** |
+| `K-001` | «`--original` reproduce las cifras de §3» | **Solo mientras los huevos eran los de antes.** `--original` restaura los circuitos y el `RITMO` 1, pero los huevos salen de las reglas de hoy: filas cada 110 m (`K-201`) y reaparición a 1 s (`H-105`). Medido en K3: 12,3 min, hueco de **30 s** (no 47) y **2,28** objetos/min (no 1,39). La reproducción exacta de §3 del cierre de K1 se midió antes de aplicar `K-201`, y el bloque de resultados no lo decía. Se deja así —los huevos de antes no tienen sentido en el juego de ahora— y `--original` queda como «circuitos y ritmo de antes» |
 | `DK5` | 0,44 adelantamientos sufridos por minuto | Es la cifra del baseline (parrilla rotada). Con el muestreo de `K-001` (chalana sin tripulación) son **0,08 sufridos + 0,21 ganados = 0,29 por minuto**. KG4 se mide con este último |
 
 ---
@@ -329,7 +331,9 @@ export type Aviso =
   | { tipo: 'teAdelantan'; quien: number }
   | { tipo: 'adelantas'; quien: number }
   | { tipo: 'huevo' }
-  | { tipo: 'golpe'; objeto: TipoObjeto }
+  | { tipo: 'usas'; objeto: TipoObjeto }
+  | { tipo: 'golpe' }            // el impacto no sabe qué objeto lo causó
+  | { tipo: 'ahogo' }
   | { tipo: 'turbo'; origen: 'salida' | 'cenir' | 'objeto' };
 
 // src/render/tresd/vista.ts (o trazado.ts si se quiere probar sin three) — [K-301]

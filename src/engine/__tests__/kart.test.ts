@@ -1,14 +1,18 @@
 // SPEC-006 · Ritmo de kart. Fase K2: la salida, la ceñida y las rivales que las usan.
+// Fase K3: el encuadre, la cuenta atrás y los avisos.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { avanzar, CARGA_CORTA, CARGA_LARGA, CUENTA_ATRAS, miniturbo, PASO } from '../carrera.ts';
 import { CLAVA_LA_SALIDA, decidir, salidaDeRival } from '../ia.ts';
 import { RITMO } from '../ritmo.ts';
 import { crearRng } from '../rng.ts';
 import type { EstadoRegata, Mando, Nave, Personalidad } from '../tipos.ts';
-import { mando, montar } from './ayudas.ts';
+import { fovPara } from '../../render/tresd/encuadre.ts';
+import { MotorDeRegata } from '../../juego/motor.ts';
+import { circuito, inscribir, mando, montar } from './ayudas.ts';
 
 /** La ría: el tramo 1 es una curva de radio +30 entre los metros 102 y 222. Dentro = carril 0. */
 const CURVA = { desde: 102, hasta: 222 };
@@ -139,4 +143,64 @@ test('[K-204] la lanzada ciñe al final de la curva cuando caza al jugador', () 
 test('[K-204] la regular no ciñe, y nadie ciñe por delante del jugador', () => {
   assert.equal(rivalCinendo('regular', CURVA.hasta + 60).timon, 0);
   assert.equal(rivalCinendo('lanzada', 20).timon, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Fase K3: que se note
+// ---------------------------------------------------------------------------
+
+test('[K-301] el FOV se abre con la velocidad de pantalla y el turbo lo pasa', () => {
+  assert.equal(fovPara(0, 13, false), 62);
+  assert.equal(fovPara(13, 13, false), 76);
+  assert.equal(fovPara(13, 13, true), 82);
+  assert.equal(fovPara(20, 13, false), 76, 'por encima de la velocidad de casco no se abre más sin turbo');
+  let anterior = -Infinity;
+  for (let v = 0; v <= 20; v += 0.5) {
+    for (const turbo of [false, true]) {
+      const fov = fovPara(v, 13, turbo);
+      assert.ok(fov >= 62 && fov <= 82, `${fov}° a ${v} m/s`);
+    }
+    const fov = fovPara(v, 13, false);
+    assert.ok(fov >= anterior, `no es monótona a ${v} m/s`);
+    anterior = fov;
+  }
+});
+
+test('[K-302] la cuenta atrás y los avisos no hablan en newtons', () => {
+  const prohibidos = [/\bnewtons?\b/i, /\bempuje\b/i, /\bN\b/];
+  for (const f of ['src/components/Cuenta.tsx', 'src/components/Avisos.tsx']) {
+    // Sin comentarios: lo que queda son las cadenas y el JSX que se enseñan.
+    const codigo = readFileSync(new URL(`../../../${f}`, import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\/\/[^\n]*/g, ' ');
+    const textos = [...codigo.matchAll(/'([^']*)'|`([^`]*)`|>([^<>{}]+)</g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '').join(' ');
+    for (const p of prohibidos) assert.ok(!p.test(textos), `${f} enseña «${textos.match(p)?.[0]}»`);
+  }
+});
+
+test('[K-303] los avisos cuentan lo mismo que el marcador', () => {
+  const { est, rng, circuito: c } = montar('canal', { barca: 'chalana', tripulacion: [] }, { semilla: 5, cuentaAtras: CUENTA_ATRAS });
+  const cuenta = new Map<string, number>();
+  let e = est;
+  while (!e.terminada && e.reloj < 3600) {
+    const j = jugadorDe(e);
+    e = avanzar(e, { mando: mando({ gas: 0.95, usar: j.objeto !== null }), ultimaVuelta: j.vuelta >= c.vueltas - 1 }, rng);
+    for (const a of e.avisos) cuenta.set(a.tipo, (cuenta.get(a.tipo) ?? 0) + 1);
+  }
+  assert.ok(e.adelantamientosSufridos > 0, 'la regata de prueba no tiene adelantamientos: no prueba nada');
+  assert.equal(cuenta.get('teAdelantan') ?? 0, e.adelantamientosSufridos);
+  assert.equal(cuenta.get('huevo') ?? 0, jugadorDe(e).huevosRotos);
+  assert.ok((cuenta.get('usas') ?? 0) > 0, 'el jugador no soltó ningún objeto');
+});
+
+test('[K-303] la costura acumula los avisos: React no pinta cada tick', () => {
+  const c = { ...circuito('canal'), vueltas: 1 };
+  const motor = new MotorDeRegata(c, [inscribir('Tú', { barca: 'chalana', tripulacion: [] }, true)], 3, RITMO);
+  // Pisa a tope en el último instante de la cuenta atrás: salida perfecta.
+  while (motor.est.cuentaAtras > 0) motor.tictac(PASO, mando({ gas: motor.est.cuentaAtras <= 0.3 * RITMO ? 1 : 0 }));
+  const recientes = motor.avisosRecientes(2);
+  assert.ok(recientes.some((a) => a.aviso.tipo === 'turbo' && a.aviso.origen === 'salida'), JSON.stringify(recientes));
+  // Diez segundos reales después ya no es reciente.
+  for (let i = 0; i < 10 / PASO; i++) motor.tictac(PASO, mando({ gas: 0 }));
+  assert.ok(!motor.avisosRecientes(2).some((a) => a.aviso.tipo === 'turbo' && a.aviso.origen === 'salida'));
 });

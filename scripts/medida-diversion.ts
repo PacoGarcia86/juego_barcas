@@ -7,9 +7,10 @@
 //
 // Los adelantamientos se cuentan con la histéresis de `B-702` o no se cuentan:
 // tick a tick, dos barcas en paralelo intercambian el orden cada paso y la
-// cifra dice 28 por minuto en una regata y 0,08 en otra (SPEC-006 §3).
+// cifra dice 28 por minuto en una regata y 0,08 en otra (SPEC-006 §3). Desde
+// K3 los cuenta el motor (`est.avisos`, `K-303`) y aquí solo se leen.
 
-import { avanzar, HISTERESIS_ADELANTAMIENTO } from '../src/engine/carrera.ts';
+import { avanzar } from '../src/engine/carrera.ts';
 import type { Rng } from '../src/engine/rng.ts';
 import type { EstadoRegata, Mando } from '../src/engine/tipos.ts';
 
@@ -34,18 +35,10 @@ export interface Medida {
 /** Corre la regata hasta que el jugador cruza la meta y la mide. */
 export function medirRegata(inicial: EstadoRegata, rng: Rng, piloto: Piloto, ritmo: number, topeSim = 3600): Medida {
   let est = inicial;
-  const yo0 = est.naves.find((n) => n.jugador)!;
-  // [B-702] en espejo: las que salen DETRÁS ya están consolidadas detrás.
-  let detras = new Set(est.naves.filter((n) => !n.jugador && n.metros < yo0.metros).map((n) => n.indice));
-  let pendientes = new Map<number, number>();
   let ganados = 0;
   let usados = 0;
   let ultimo = 0;
   let hueco = 0;
-  let huevosAntes = 0;
-  let efectosAntes = 0;
-  let objetoAntes = yo0.objeto;
-  let sufridosAntes = 0;
 
   while (!est.terminada && est.reloj < topeSim) {
     const yo = est.naves.find((n) => n.jugador)!;
@@ -54,36 +47,13 @@ export function medirRegata(inicial: EstadoRegata, rng: Rng, piloto: Piloto, rit
     const j = est.naves.find((n) => n.jugador)!;
     if (j.tiempoMeta !== null) break;
 
-    // Adelantamientos GANADOS: una rival que se queda detrás 3 s seguidos.
-    const nuevasPendientes = new Map<number, number>();
-    const nuevoDetras = new Set<number>();
-    let gana = false;
-    for (const r of est.naves) {
-      if (r.jugador || r.tiempoMeta !== null || r.metros >= j.metros) continue;
-      if (detras.has(r.indice)) {
-        nuevoDetras.add(r.indice);
-        continue;
-      }
-      const desde = pendientes.get(r.indice) ?? est.reloj;
-      if (est.reloj - desde >= HISTERESIS_ADELANTAMIENTO) {
-        ganados++;
-        gana = true;
-        nuevoDetras.add(r.indice);
-      } else nuevasPendientes.set(r.indice, desde);
+    // [K-303] El mismo registro que enseña el tablero: si algo cuenta como
+    // acontecimiento para el jugador, cuenta aquí.
+    for (const a of est.avisos) {
+      if (a.tipo === 'adelantas') ganados++;
+      if (a.tipo === 'usas') usados++;
     }
-    detras = nuevoDetras;
-    pendientes = nuevasPendientes;
-
-    let pasa = gana || est.adelantamientosSufridos !== sufridosAntes || j.huevosRotos !== huevosAntes || j.efectos.length > efectosAntes;
-    if (objetoAntes !== null && j.objeto === null) {
-      usados++;
-      pasa = true;
-    }
-    sufridosAntes = est.adelantamientosSufridos;
-    huevosAntes = j.huevosRotos;
-    efectosAntes = j.efectos.length;
-    objetoAntes = j.objeto;
-    if (pasa) {
+    if (est.avisos.length > 0) {
       hueco = Math.max(hueco, est.reloj - ultimo);
       ultimo = est.reloj;
     }

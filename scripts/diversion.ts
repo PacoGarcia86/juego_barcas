@@ -2,7 +2,8 @@
 //
 //   npm run diversion                   todos los objetivos que ya se pueden medir
 //   npm run diversion -- --fase K1      solo los de esa fase
-//   npm run diversion -- --original     RITMO 1 y los circuitos de antes: SPEC-006 §3
+//   npm run diversion -- --original     RITMO 1 y los circuitos de antes, con los huevos de hoy
+//                                       (§3 se midió con filas cada 180 m y reaparición a 2 s)
 //
 // Mismo muestreo que SPEC-006 §3: chalana sin tripulación con el piloto medio,
 // cuatro circuitos por ocho semillas. Todas las cifras en segundos y minutos

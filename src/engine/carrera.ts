@@ -8,6 +8,7 @@
 // [B-903] Sin E/S. El azar entra por el `Rng` que se recibe.
 
 import type {
+  Aviso,
   ContextoRegata,
   EstadoRegata,
   Circuito,
@@ -185,6 +186,8 @@ export function crearRegata(
   // [B-702] Las que salen delante ya están «consolidadas»: no cuentan como
   // adelantamiento, porque no han adelantado a nadie.
   const delante = indiceJugador < 0 ? [] : naves.filter((n) => !n.jugador && n.metros > naves[indiceJugador]!.metros).map((n) => n.indice);
+  // [K-303] Y en espejo, las que salen detrás: pasarlas no cuenta.
+  const detras = indiceJugador < 0 ? [] : naves.filter((n) => !n.jugador && n.metros < naves[indiceJugador]!.metros).map((n) => n.indice);
 
   return {
     circuito,
@@ -196,6 +199,9 @@ export function crearRegata(
     adelantamientosSufridos: 0,
     pendientes: [],
     delante,
+    detras,
+    pendientesDetras: [],
+    avisos: [],
     terminada: false,
     proximoObjeto: 1,
   };
@@ -217,6 +223,8 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
   const naves = est.naves.map((n) => ({ ...n, efectos: n.efectos.slice() }));
   const total = longitudTotal(est.circuito);
   const vueltaLarga = longitudDeVuelta(est.circuito);
+  // [K-303] Lo que le pasa al jugador en este tick.
+  const avisos: Aviso[] = [];
 
   // -- 1. Decisión ---------------------------------------------------------
   traza?.push('decision');
@@ -236,6 +244,7 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
     }
     for (const [i, impacto] of paso.impactos) {
       const nave = naves[i]!;
+      if (nave.jugador) avisos.push({ tipo: 'golpe' });
       nave.velocidad = Math.max(VELOCIDAD_MINIMA, nave.velocidad * impacto.factor);
       for (const efecto of impacto.efectos) nave.efectos.push(acortar(efecto, nave));
     }
@@ -243,8 +252,13 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
     naves.forEach((nave, i) => {
       if (!mandos[i]!.usar || nave.objeto === null || nave.tiempoMeta !== null) return;
       const lanzamiento = usarObjeto(nave.objeto, i, { ...est, naves, objetos });
+      if (nave.jugador) avisos.push({ tipo: 'usas', objeto: nave.objeto });
       for (const o of lanzamiento.objetos) objetos = [...objetos, { ...o, id: proximoObjeto++ }];
-      for (const { indice, efecto } of lanzamiento.efectos) naves[indice]!.efectos.push(acortar(efecto, naves[indice]!));
+      for (const { indice, efecto } of lanzamiento.efectos) {
+        naves[indice]!.efectos.push(acortar(efecto, naves[indice]!));
+        // [K-303] La racha propia es un turbo; lo que te echa otra, un golpe.
+        if (naves[indice]!.jugador) avisos.push(indice === i && efecto.tipo === 'turbo' ? { tipo: 'turbo', origen: 'objeto' } : { tipo: 'golpe' });
+      }
       for (const { indice, factor } of lanzamiento.golpes) {
         naves[indice]!.velocidad = Math.max(VELOCIDAD_MINIMA, naves[indice]!.velocidad * factor);
       }
@@ -310,7 +324,10 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
       if (cine) nave.cargaMiniturbo += dt;
       else if (nave.cargaMiniturbo > 0) {
         const turbo = miniturbo(nave.cargaMiniturbo);
-        if (turbo !== null && !tieneEfecto(nave.efectos, 'turbo')) nave.efectos.push(turbo);
+        if (turbo !== null && !tieneEfecto(nave.efectos, 'turbo')) {
+          nave.efectos.push(turbo);
+          if (nave.jugador) avisos.push({ tipo: 'turbo', origen: 'cenir' });
+        }
         nave.cargaMiniturbo = 0;
       }
     }
@@ -374,12 +391,13 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
       if (nave.objeto === null) nave.objeto = objeto;
       else nave.guardado = objeto;
       nave.huevosRotos++;
+      if (nave.jugador) avisos.push({ tipo: 'huevo' });
     });
   }
 
   // -- 7. Adelantamientos [B-702] -----------------------------------------
   traza?.push('adelantamientos');
-  let { adelantamientosSufridos, pendientes, delante } = est;
+  let { adelantamientosSufridos, pendientes, delante, detras, pendientesDetras } = est;
   const jugador = naves.find((n) => n.jugador);
   if (jugador !== undefined) {
     const reloj = est.reloj + dt;
@@ -399,6 +417,7 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
       } else if (reloj - pendiente.desde >= HISTERESIS_ADELANTAMIENTO) {
         // Ha aguantado delante: ahora sí, es un adelantamiento.
         adelantamientosSufridos++;
+        avisos.push({ tipo: 'teAdelantan', quien: rival.indice });
         nuevoDelante.push(rival.indice);
       } else {
         nuevasPendientes.push(pendiente);
@@ -406,6 +425,28 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
     }
     pendientes = nuevasPendientes;
     delante = nuevoDelante;
+
+    // [K-303] Los GANADOS, en espejo y con la misma histéresis: una rival que
+    // se queda detrás 3 s seguidos. Sin histéresis, dos barcas en paralelo se
+    // pasan cada tick (`DB6`).
+    const nuevasDetras: { indice: number; desde: number }[] = [];
+    const nuevoDetras: number[] = [];
+    for (const rival of naves) {
+      if (rival.jugador || rival.tiempoMeta !== null || jugador.tiempoMeta !== null) continue;
+      if (metrosDe(rival) >= metrosDe(jugador)) continue;
+      if (detras.includes(rival.indice)) {
+        nuevoDetras.push(rival.indice);
+        continue;
+      }
+      const pendiente = pendientesDetras.find((p) => p.indice === rival.indice);
+      if (pendiente === undefined) nuevasDetras.push({ indice: rival.indice, desde: reloj });
+      else if (reloj - pendiente.desde >= HISTERESIS_ADELANTAMIENTO) {
+        avisos.push({ tipo: 'adelantas', quien: rival.indice });
+        nuevoDetras.push(rival.indice);
+      } else nuevasDetras.push(pendiente);
+    }
+    pendientesDetras = nuevasDetras;
+    detras = nuevoDetras;
   }
 
   // -- 8. Meta [B-305] -----------------------------------------------------
@@ -430,6 +471,9 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
     adelantamientosSufridos,
     pendientes,
     delante,
+    detras,
+    pendientesDetras,
+    avisos,
     proximoObjeto,
     terminada: naves.every((n) => n.tiempoMeta !== null),
   };
@@ -449,17 +493,22 @@ function contarAtras(est: EstadoRegata, ctx: ContextoRegata, rng: Rng): EstadoRe
   // Medio paso de tolerancia: 9 − 180·0,05 no da cero exacto en coma flotante.
   const cuentaAtras = est.cuentaAtras - PASO < PASO / 2 ? 0 : est.cuentaAtras - PASO;
   const naves = est.naves.map((n) => ({ ...n, efectos: n.efectos.slice() }));
+  const avisos: Aviso[] = [];
   for (const nave of naves) {
     if (nave.jugador && nave.arranque === null && ctx.mando.gas >= GAS_A_TOPE) nave.arranque = est.cuentaAtras;
   }
   if (cuentaAtras === 0) {
     // En el orden de la parrilla, siempre el mismo: misma semilla, misma salida.
     for (const nave of naves) {
-      const efecto = efectoDeSalida(nave.jugador ? salidaDelJugador(nave.arranque) : salidaDeRival(nave.personalidad, rng));
+      const salida = nave.jugador ? salidaDelJugador(nave.arranque) : salidaDeRival(nave.personalidad, rng);
+      const efecto = efectoDeSalida(salida);
       if (efecto !== null) nave.efectos.push(efecto);
+      // [K-302] [K-303] Lo que el tablero celebra o lamenta.
+      if (nave.jugador && salida === 'turbo') avisos.push({ tipo: 'turbo', origen: 'salida' });
+      if (nave.jugador && salida === 'ahogo') avisos.push({ tipo: 'ahogo' });
     }
   }
-  return { ...est, naves, cuentaAtras };
+  return { ...est, naves, cuentaAtras, avisos };
 }
 
 /** [K-202] Lo que saca el jugador de su salida, según cuándo pisó. */

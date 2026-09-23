@@ -11,18 +11,32 @@ import { doblonesDe } from '../engine/economia.ts';
 import { huevosDe } from '../engine/huevos.ts';
 import { crearRng, type Rng } from '../engine/rng.ts';
 import { RITMO } from '../engine/ritmo.ts';
-import type { Circuito, EstadoRegata, Mando, Resultado } from '../engine/tipos.ts';
+import type { Aviso, Circuito, EstadoRegata, Mando, Resultado } from '../engine/tipos.ts';
 
 /** Tope de pasos por fotograma y por unidad de `RITMO`: si la pestaña vuelve
  *  de segundo plano tras un minuto, no se simulan mil segundos de golpe y se
  *  cuelga el navegador. */
 const TOPE_PASOS = 6;
 
+/** [K-303] Avisos que se guardan, como mucho: el tablero solo enseña los recientes. */
+const TOPE_AVISOS = 40;
+
+/** [K-303] Un aviso con la hora de la regata (s de simulación) a la que pasó. */
+export interface AvisoFechado {
+  reloj: number;
+  aviso: Aviso;
+}
+
 export class MotorDeRegata {
   private estado: EstadoRegata;
   private readonly rng: Rng;
   private acumulado = 0;
   private resultado: Resultado | null = null;
+  /**
+   * [K-303] El motor deja en `est.avisos` solo los del último tick, y React no
+   * pinta cada tick: aquí se acumulan para que ninguno se pierda.
+   */
+  private registro: AvisoFechado[] = [];
 
   /**
    * [K-101] `ritmo` son segundos de simulación por segundo real. Solo cambia
@@ -61,6 +75,7 @@ export class MotorDeRegata {
       const jugador = this.estado.naves[this.jugador];
       const ultimaVuelta = jugador !== undefined && jugador.vuelta >= this.estado.circuito.vueltas - 1;
       this.estado = avanzar(this.estado, { mando, ultimaVuelta }, this.rng);
+      for (const aviso of this.estado.avisos) this.registro.push({ reloj: this.estado.reloj, aviso });
       this.acumulado -= PASO;
       pasos++;
     }
@@ -68,6 +83,13 @@ export class MotorDeRegata {
       const r = resultadoDe(this.estado, 0);
       this.resultado = { ...r, doblones: doblonesDe(r) };
     }
+  }
+
+  /** [K-303] Los avisos de los últimos `segundosReales` de pantalla, del más viejo al más nuevo. */
+  avisosRecientes(segundosReales: number): AvisoFechado[] {
+    if (this.registro.length > TOPE_AVISOS) this.registro = this.registro.slice(-TOPE_AVISOS);
+    const desde = this.estado.reloj - segundosReales * this.ritmo;
+    return this.registro.filter((a) => a.reloj >= desde);
   }
 
   /** [B-701] El resultado, una vez bajada la bandera. */
