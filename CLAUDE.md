@@ -8,7 +8,8 @@ servidor.
 
 El valor del proyecto está en `src/engine/`: la física del casco, la táctica de los rivales y la
 ruleta de objetos. `src/render/` dibuja la regata en 3D real sobre WebGL 2 (three.js): agua de
-Gerstner, luz direccional y estela.
+Gerstner que refleja el cielo, sol y nubes procedurales, estela, sombras y post-proceso HDR con
+resplandor. Todo procedural: ni una textura ni un modelo que descargar.
 
 ## Regla 1 — este proyecto es spec-driven
 
@@ -96,11 +97,12 @@ src/render/          3D real sobre WebGL 2 (three.js)
   paleta.ts          Hora y mar → todos los colores                [R-401]
   tresd/
     trazado.ts       Circuito → eje en el mundo. PURO, sin three   [R-1xx]
-    agua.ts          Malla de Gerstner, espuma y estela            [R-2xx]
+    agua.ts          Malla de Gerstner, reflejo, espuma            [R-2xx]
+    cielo.ts         Sol, nubes y estrellas. El agua lo refleja    [R-406]
     barca.ts         Malla procedural de casco, vela y remos       [R-3xx]
     mundo.ts         Cielo, costa, islas, boyas, niebla            [R-4xx]
     flota.ts         Las ocho barcas en pocas llamadas de dibujo   [R-3xx]
-    vista.ts         Renderizador y cámara. Lo único que toca GL   [R-5xx]
+    vista.ts         Renderizador, cámara y post-proceso HDR       [R-5xx]
 
 src/juego/motor.ts   Costura entre el motor y React                [R-6xx]
 src/components/      Lienzo · Tablero · Mando · FichaBarca

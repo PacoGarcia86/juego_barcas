@@ -8,20 +8,28 @@
 
 import {
   ACESFilmicToneMapping,
-  Color as ColorTres,
-  PCFSoftShadowMap,
+  HalfFloatType,
+  PCFShadowMap,
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
+  Vector2,
   Vector3,
   WebGLRenderer,
+  WebGLRenderTarget,
 } from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Circuito, EstadoRegata } from '../../engine/tipos.ts';
 import { paletaDe, type Paleta } from '../paleta.ts';
 import { Agua } from './agua.ts';
+import { Cielo, uniformesDeCielo, type UniformesCielo } from './cielo.ts';
 import { Flota } from './flota.ts';
 import { Mundo } from './mundo.ts';
-import { construirTrazado, lateralDe, puntoDeMira, puntoEn, rumboEn, type Trazado } from './trazado.ts';
+import { construirTrazado, lateralDe, posicionEn, puntoDeMira, puntoEn, rumboEn, type Trazado } from './trazado.ts';
 
 /**
  * [R-501] Metros por detrás de la barca seguida.
@@ -47,6 +55,37 @@ const FOV_LANZADO = 76;
 const PRESUPUESTO = 30;
 /** Fotogramas seguidos malos antes de bajar la calidad. */
 const PACIENCIA = 60;
+/** [R-505] Resplandor: fuerza, radio y umbral (en lineal, HDR). */
+const RESPLANDOR = { fuerza: 0.42, radio: 0.55, umbral: 0.92 };
+
+/**
+ * [R-505] Viñeta y un toque de contraste, en lineal y ANTES del mapeo de
+ * tonos. Oscurece las esquinas para que la vista vaya al centro, que es donde
+ * está la regata.
+ */
+const VINETA = {
+  uniforms: { tDiffuse: { value: null }, fuerza: { value: 0.32 } },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float fuerza;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec2 d = vUv - 0.5;
+      float v = 1.0 - fuerza * smoothstep(0.25, 0.85, dot(d, d) * 2.2);
+      float luma = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      vec3 color = mix(vec3(luma), c.rgb, 1.08);
+      gl_FragColor = vec4(color * v, c.a);
+    }
+  `,
+};
 
 export interface Diagnostico {
   fps: number;
@@ -57,7 +96,11 @@ export interface Diagnostico {
 
 export class Vista {
   private readonly renderizador: WebGLRenderer;
+  private readonly compositor: EffectComposer;
+  private readonly resplandor: UnrealBloomPass;
   private readonly escena = new Scene();
+  private readonly cielo: Cielo;
+  private readonly uniformesCielo: UniformesCielo;
   private readonly camara: PerspectiveCamera;
   private readonly agua: Agua;
   private readonly mundo: Mundo;
@@ -79,21 +122,36 @@ export class Vista {
     this.paleta = paletaDe(est.circuito);
     this.trazado = construirTrazado(est.circuito);
 
-    this.renderizador = new WebGLRenderer({ canvas: lienzo, antialias: true, powerPreference: 'high-performance' });
+    // Sin `antialias` en el lienzo: se dibuja a un objetivo intermedio y el
+    // suavizado lo hace su MSAA [R-505].
+    this.renderizador = new WebGLRenderer({ canvas: lienzo, antialias: false, powerPreference: 'high-performance' });
     this.renderizador.setPixelRatio(Math.min(2, globalThis.devicePixelRatio ?? 1));
     this.renderizador.outputColorSpace = SRGBColorSpace;
     this.renderizador.toneMapping = ACESFilmicToneMapping;
-    this.renderizador.toneMappingExposure = 1.05;
+    this.renderizador.toneMappingExposure = 1.0;
     this.renderizador.shadowMap.enabled = true;
-    this.renderizador.shadowMap.type = PCFSoftShadowMap;
-    this.escena.background = new ColorTres(this.paleta.cielo);
+    // [R-602] Con el compositor hay varios `render` por fotograma: el contador
+    // se pone a cero a mano, o el diagnóstico solo vería el último pase.
+    this.renderizador.info.autoReset = false;
+    // `PCFSoftShadowMap` ya no existe en three 0.186: pedirlo solo dejaba un
+    // aviso en la consola y el suave de serie (`DR11`).
+    this.renderizador.shadowMap.type = PCFShadowMap;
 
     this.camara = new PerspectiveCamera(FOV_PARADO, 1, 0.5, 1800);
+
+    // [R-406] El cielo, y sus uniformes, que comparte el agua [R-206].
+    this.uniformesCielo = uniformesDeCielo(this.paleta);
+    this.cielo = new Cielo(this.uniformesCielo);
+    this.escena.add(this.cielo.malla);
+
     this.agua = new Agua({
       colorHondo: this.paleta.aguaHonda,
       colorSomero: this.paleta.aguaSomera,
       colorEspuma: this.paleta.espuma,
-      colorCielo: this.paleta.horizonte,
+      // [R-207] La misma niebla que la escena: el mismo campo de la paleta.
+      colorNiebla: this.paleta.niebla,
+      densidadNiebla: this.paleta.densidadNiebla,
+      cielo: this.uniformesCielo,
       radio: 420,
       anillos: 110,
       sectores: 128,
@@ -103,12 +161,24 @@ export class Vista {
     this.flota = new Flota(est.naves, this.paleta);
     this.escena.add(this.flota.raiz);
 
+    // [R-505] HDR en coma flotante y con MSAA; el mapeo de tonos y el sRGB, al
+    // final y una sola vez (`OutputPass`).
+    const objetivo = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: 4 });
+    this.compositor = new EffectComposer(this.renderizador, objetivo);
+    this.compositor.addPass(new RenderPass(this.escena, this.camara));
+    this.resplandor = new UnrealBloomPass(new Vector2(256, 256), RESPLANDOR.fuerza, RESPLANDOR.radio, RESPLANDOR.umbral);
+    this.compositor.addPass(this.resplandor);
+    this.compositor.addPass(new ShaderPass(VINETA));
+    this.compositor.addPass(new OutputPass());
+
     const jugador = est.naves.find((n) => n.jugador) ?? est.naves[0]!;
     this.metrosCamara = jugador.metros - RETRASO_BASE - jugador.barca.eslora * RETRASO_POR_ESLORA;
   }
 
   redimensionar(ancho: number, alto: number): void {
     this.renderizador.setSize(ancho, alto, false);
+    this.compositor.setPixelRatio(this.renderizador.getPixelRatio());
+    this.compositor.setSize(ancho, alto);
     this.camara.aspect = ancho / Math.max(1, alto);
     this.camara.updateProjectionMatrix();
   }
@@ -119,6 +189,7 @@ export class Vista {
    */
   dibujar(est: EstadoRegata, dt: number, seguido: number): void {
     const arranque = performance.now();
+    this.renderizador.info.reset();
     const nave = est.naves[seguido] ?? est.naves[0]!;
     const oleaje = Math.min(1, Math.max(0, this.circuito.oleajeBase + 0.15));
 
@@ -146,12 +217,17 @@ export class Vista {
     this.camara.fov = this.fovActual;
     this.camara.updateProjectionMatrix();
 
+    this.cielo.actualizar(this.camara);
+    this.uniformesCielo.tiempoCielo.value = est.reloj;
     this.agua.actualizar(this.camara, est.reloj, oleaje);
+    // [R-506] Las sombras van con la barca seguida.
+    const seguida = posicionEn(this.trazado, nave.metros, nave.carril, Math.max(2, Math.floor(this.anchuraDe(nave.metros) / 4.5)));
+    this.mundo.seguirSombra(seguida.x, seguida.z);
     this.mundo.actualizarHuevos(est.huevos, est.reloj, oleaje);
     this.mundo.actualizarBoyas(est.reloj, oleaje);
     this.flota.actualizar(est.naves, this.trazado, est.reloj, oleaje, dt);
 
-    this.renderizador.render(this.escena, this.camara);
+    this.compositor.render(dt);
 
     // [R-603] Si el equipo no da, se simplifica. Y se declara: quien llama lo
     // enseña en el diagnóstico, no se hace en silencio.
@@ -162,6 +238,9 @@ export class Vista {
       if (this.malos > PACIENCIA) {
         this.flota.apagarEstela();
         this.agua.simplificar();
+        // [R-603] [R-505] [R-506] El resplandor y las sombras, fuera.
+        this.resplandor.enabled = false;
+        this.mundo.apagarSombras();
         this.renderizador.shadowMap.enabled = false;
         this.simplificado = true;
       }
@@ -192,6 +271,8 @@ export class Vista {
     this.flota.destruir();
     this.mundo.destruir();
     this.agua.destruir();
+    this.cielo.destruir();
+    this.compositor.dispose();
     this.renderizador.dispose();
   }
 }
