@@ -65,7 +65,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | [SPEC-003](003-astillero-y-tripulacion.md) | El astillero y la tripulación | `A-` | ✅ COMPLETADA (Fase A1) |
 | [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1 y R2) |
 | [SPEC-005](005-progreso-y-despliegue.md) | Progreso, aplicación y despliegue | `P-` | ✅ COMPLETADA (Fase P1) |
-| [SPEC-006](006-ritmo-de-kart.md) | Ritmo de kart | `K-` | 🚧 EN CURSO (Fase K1) |
+| [SPEC-006](006-ritmo-de-kart.md) | Ritmo de kart | `K-` | 🚧 EN CURSO (K1 ✅ · K2 en curso) |
 
 ---
 
@@ -103,4 +103,6 @@ Se anota aquí para que no se pierda. No es una promesa de calendario.
 | El crédito CC-BY de la lancha no se ve dentro del juego | `004` `R-303` | El modelo es de JuanSimon (Sketchfab, CC-BY-4.0). El crédito está en `arte/barcas/CREDITOS.md` y en la cabecera de `modelos.ts`; falta una pantalla de créditos en la aplicación |
 | De noche las lanchas se leen como siluetas negras | `004` `R-401` | Visto en una captura de `Punta Tormenta` a mitad de R2, antes de que todas fueran lanchas; no se ha vuelto a mirar. La luz nocturna de `paleta.ts` es la de R1 y no se ha comparado con las barcas anteriores |
 | El arnés de capturas dibuja por software y no mide fotogramas de verdad | `004` `RG2` | SwiftShader en el contenedor. Lo que sí mide son llamadas de dibujo, triángulos y **lo que se ve**, que es lo que encontró `DR1`, `DR6` y `DR7` |
+| Tres vueltas por regata, como en el kart | `006` `KQ2` | Solo caben recortando la geometría, y eso rompe `B-202` (patín 62 %, trainera y galeota 0 %). Haría falta rediseñar los circuitos, no escalarlos |
+| El arnés de regata (`regata-humo`, `baseline`) imprime tiempos de simulación, no de pantalla | `006` `K-101` | Sus umbrales de SPEC-001 están en simulación y siguen valiendo; `npm run diversion` es el que habla en tiempo real |
 | Olas de Gerstner que empujen de verdad a la barca | `004` `RQ2` | Hoy el oleaje del motor (`B-207`) y el del render (`R-201`) son dos cuentas distintas: se ven iguales pero no lo son |

@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | SPEC-006 |
 | **Título** | Una regata dura tres minutos y pasa algo cada pocos segundos, sin romper el compromiso de los cascos |
-| **Estado** | 🚧 `EN CURSO` (aprobada 2026-09-23 · Fase K1) |
+| **Estado** | 🚧 `EN CURSO` (Fase K1 ✅ cerrada 2026-09-23 · Fase K2 en curso) |
 | **Autor** | — |
 | **Creado** | 2026-09-23 |
 | **Módulos afectados** | `src/engine/{carrera,huevos,ia,objetos}.ts`, `src/engine/datos/circuitos.ts`, `src/juego/motor.ts`, `src/render/tresd/vista.ts`, `src/components/{Tablero,Mando}.tsx`, `scripts/` |
@@ -205,12 +205,30 @@ La suite completa sigue en verde. `npm run baseline` sigue pasando su puerta en 
 
 ## 7. Fases y puertas de salida
 
-### Fase K1 — Arnés y ritmo
+### Fase K1 — Arnés y ritmo · ✅ **CERRADA 2026-09-23**
 **Alcance:** `K-001`, `K-101`, `K-102`, `K-103`, `K-201` (adelantado de K2, y la reescritura de
 `H-102` en SPEC-002 antes de tocar `huevos.ts`)
 **Puerta:** `npm run diversion` reproduce §3 con `--original` y, con el ritmo nuevo, cumple
 **KG1** y **KG2**. `npm run baseline` en verde (**KG6**). `npm run objetos-audit` en verde. Lint,
 tests y build limpios.
+**Resultado:** 170 tests en verde (6 nuevos en `ritmo.test.ts`) · `tsc --noEmit` limpio ·
+`vite build` correcto · `baseline`, `objetos-audit` y `diversion --fase K1` superados.
+
+| Comprobación | Resultado |
+|---|---|
+| `K-001` · `diversion --original` contra §3 | **12,4 min · 47 s de hueco (peor 146) · 1,39 objetos/min**: idéntico a §3 |
+| `KG1` · duración de la regata | **3,7 min** de mediana (antes 12,4); peor circuito **3,9** (faro y tormenta). Umbral 2,5–4, peor ≤ 5 |
+| `KG2` · velocidad de la flota en pantalla | **12,05–12,99 m/s** (antes 4,0–4,4). Umbral ≥ 8 |
+| `KG3` · hueco sin acontecimiento (no exigido en K1) | **10 s** de mediana, peor **16 s** (antes 47 y 146). Ya dentro del umbral de K2 |
+| `KG4` · pelea (no exigido en K1) | **1,10** adelantamientos/min (antes 0,29). Umbral de K2: 1,5 |
+| `KG6` · baseline, velocidad media | **4,06–4,72 m/s** de simulación (antes 4,07–4,75) |
+| `KG6` · baseline, diferencia del 2.º | mediana **0,96 s**, peor **1,1 %** del ganador (umbral 0,4–8 s, < 25 %) |
+| `KG6` · baseline, adelantamientos sufridos | media **5,3**, rango 0–31 (umbral 3–12) |
+| `KG6` · baseline, reparto de victorias | patín **21 %**, trainera 21 %, galeota 12 %, neumática 12 %, lancha 7 %, chalana 2 % (umbral < 45 %; las cinco de pago ganan alguna) |
+| `HG3` · huevos del jugador, mínimo en `objetos-audit` | **13** (umbral ≥ 12; con 2 vueltas y filas de 180 m eran 10) |
+| `K-101` · misma regata a ritmo 1 y 3 | estados **idénticos** tras 60 s (`deepEqual`) |
+| `K-102` · tramos contra la copia de antes | **idénticos** en los 4 circuitos; `R-105`/`R-106` en verde sin tocarlos |
+| `K-201` · paso real entre filas | **101–106 m** (ceil de vuelta/110) |
 
 ### Fase K2 — Acción
 **Alcance:** `K-202`, `K-203`, `K-204`
@@ -296,9 +314,9 @@ export function fovPara(vPantalla: number, vCascoPantalla: number, turbo: boolea
 
 | Defecto | Requisito | Fase | Estado | Test de regresión |
 |---|---|---|---|---|
-| DK1 · 12,4 min por regata | K-101, K-102 | K1 | 📋 | `[K-102]` · `npm run diversion` |
-| DK2 · 4,1–4,8 m/s | K-101 | K1 | 📋 | `[K-101]` · `npm run diversion` |
-| DK3 · 47 s sin que pase nada | K-201, K-202, K-203 | K1/K2 | 📋 | `[K-201]` · `npm run diversion` |
-| DK4 · 1,39 objetos/min | K-201 | K1 | 📋 | `[K-201]` · `npm run objetos-audit` |
+| DK1 · 12,4 min por regata | K-101, K-102 | K1 | ✅ 3,7 min | `[K-102]` · `npm run diversion` |
+| DK2 · 4,1–4,8 m/s | K-101 | K1 | ✅ 12,1–13,0 m/s | `[K-101]` · `npm run diversion` |
+| DK3 · 47 s sin que pase nada | K-201, K-202, K-203 | K1/K2 | 🟡 10 s tras K1 | `[K-201]` · `npm run diversion` |
+| DK4 · 1,39 objetos/min | K-201 | K1 | ✅ 6,78/min | `[K-201]` · `npm run objetos-audit` |
 | DK5 · 0,44 adelantamientos/min | K-203, K-204, K-303 | K2/K3 | 📋 | `npm run diversion` |
 | DK6 · FOV nunca pasa de 72° | K-301 | K3 | 📋 | `[K-301]` |
