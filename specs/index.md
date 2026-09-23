@@ -65,7 +65,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | [SPEC-003](003-astillero-y-tripulacion.md) | El astillero y la tripulación | `A-` | ✅ COMPLETADA (Fase A1) |
 | [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1 y R2) |
 | [SPEC-005](005-progreso-y-despliegue.md) | Progreso, aplicación y despliegue | `P-` | ✅ COMPLETADA (Fase P1) |
-| [SPEC-006](006-ritmo-de-kart.md) | Ritmo de kart | `K-` | 🚧 EN CURSO (K1 ✅ · K2 ✅ · K3 en curso) |
+| [SPEC-006](006-ritmo-de-kart.md) | Ritmo de kart | `K-` | ✅ COMPLETADA (Fases K1, K2 y K3) |
 
 ---
 
@@ -106,4 +106,7 @@ Se anota aquí para que no se pierda. No es una promesa de calendario.
 | Tres vueltas por regata, como en el kart | `006` `KQ2` | Solo caben recortando la geometría, y eso rompe `B-202` (patín 62 %, trainera y galeota 0 %). Haría falta rediseñar los circuitos, no escalarlos |
 | El arnés de regata (`regata-humo`, `baseline`) imprime tiempos de simulación, no de pantalla | `006` `K-101` | Sus umbrales de SPEC-001 están en simulación y siguen valiendo; `npm run diversion` es el que habla en tiempo real |
 | Que la ceñida premie la habilidad también en mar abierto | `006` `KG5` | Faro y tormenta tienen dos curvas por vuelta: el experto les saca un 3,1–3,4 %, justo por encima del umbral, contra el 7–8 % de ria y canal. Haría falta otra maniobra de habilidad para las rectas |
+| Indicador de carga del miniturbo, y que el aliento no llame «racha» al miniturbo | `006` `K-203` | No lo pedía ningún requisito: en un móvil no se ve que se está cargando hasta que salta |
+| La velocidad en el tablero (nudos o km/h) | `006` `KQ3` | Cerrada sin hacer: el FOV y los avisos ya transmiten velocidad |
+| El panel `?diagnostico=1` queda tapado por los botones en un móvil | `004` `R-602` | Ya pasaba antes de SPEC-006; se vio en las capturas de K3 |
 | Olas de Gerstner que empujen de verdad a la barca | `004` `RQ2` | Hoy el oleaje del motor (`B-207`) y el del render (`R-201`) son dos cuentas distintas: se ven iguales pero no lo son |

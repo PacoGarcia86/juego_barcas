@@ -21,7 +21,7 @@ El flujo completo está en [`specs/WORKFLOW.md`](specs/WORKFLOW.md). Órdenes di
 Tres reglas que no se negocian:
 
 1. **Cada requisito tiene un ID estable** (`B-` SPEC-001, `H-` SPEC-002, `A-` SPEC-003,
-   `R-` SPEC-004, `P-` SPEC-005). El código que lo cumple lleva `// [B-xxx]`; el test que lo prueba
+   `R-` SPEC-004, `P-` SPEC-005, `K-` SPEC-006). El código que lo cumple lleva `// [B-xxx]`; el test que lo prueba
    se llama `[B-xxx] …`.
 2. **Un cambio de alcance se escribe en la especificación ANTES que en el código**, nunca después.
 3. **Ninguna afirmación sobre la regata sin medirla.** Si tocas la física, la IA, los objetos o el

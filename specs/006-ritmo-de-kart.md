@@ -4,12 +4,12 @@
 |---|---|
 | **ID** | SPEC-006 |
 | **Título** | Una regata dura tres minutos y pasa algo cada pocos segundos, sin romper el compromiso de los cascos |
-| **Estado** | 🚧 `EN CURSO` (Fases K1 y K2 ✅ cerradas 2026-09-23 · Fase K3 en curso) |
+| **Estado** | ✅ `COMPLETADA` (Fases K1, K2 y K3 · 2026-09-23) |
 | **Autor** | — |
 | **Creado** | 2026-09-23 |
 | **Módulos afectados** | `src/engine/{carrera,huevos,ia,objetos}.ts`, `src/engine/datos/circuitos.ts`, `src/juego/motor.ts`, `src/render/tresd/vista.ts`, `src/components/{Tablero,Mando}.tsx`, `scripts/` |
 | **Depende de** | SPEC-001 (reloj, estela, carriles, `B-702`), SPEC-002 (huevos `H-102`, turbo `H-201`), SPEC-004 (cámara `R-501`) |
-| **Reemplaza** | La cadencia fija de huevos de `huevos.ts:52` (`H-102` se reescribe en la fase K2) y la saturación a 8 m/s del FOV de `vista.ts:215` |
+| **Reemplaza** | La cadencia fija de huevos de `huevos.ts:52` (`H-102` se reescribió en la fase K1) y la saturación a 8 m/s del FOV de `vista.ts:215` |
 
 ---
 
@@ -258,10 +258,22 @@ El piloto experto de KG5 clava la salida y ciñe cada curva en la que puede.
 | `K-203` · carga 0,5 / 1,0 / 2,0 s | nada / turbo ×6 de 1,2 s / de 2,4 s; salir de la curva lo dispara |
 | `K-204` · salidas clavadas en 40 sorteos | dentro de ±15 puntos de 80 / 60 / 45 / 35 % |
 
-### Fase K3 — Que se note
-**Alcance:** `K-301`, `K-302`, `K-303`
+### Fase K3 — Que se note · ✅ **CERRADA 2026-09-23**
+**Alcance:** `K-301`, `K-302`, `K-303`, y `R-503` de SPEC-004 (reescrito por `K-301`)
 **Puerta:** tests de los tres requisitos; captura del arnés de render a velocidad de casco con el
 FOV en 76° y con turbo en 82°.
+**Resultado:** 187 tests en verde (4 nuevos de K3 en `kart.test.ts`) · `tsc --noEmit` limpio ·
+`vite build` correcto · `baseline`, `objetos-audit` y `diversion` superados con **las mismas cifras
+que tras K2**: los avisos no cambian la regata.
+
+| Comprobación | Resultado |
+|---|---|
+| `K-301` · `fovPara` | **62°** parado, **76°** a velocidad de casco, **82°** con turbo, monótona |
+| `K-301` · en el juego (Chromium, render por software, 10–17 fps, `?diagnostico=1`) | **76°** navegando a tope; **82°** con el miniturbo al salir de una curva ciñendo, y **79–80°** con la racha |
+| `K-302` · cuenta atrás en pantalla | «3 · 2 · 1 · ¡Ya!» con la pista «Pisa a tope justo antes de la salida»; sin «N», «newtons» ni «empuje» (test estático) |
+| `K-303` · avisos contra marcador (canal, semilla 5) | avisos «te adelantan» = `adelantamientosSufridos`; avisos de huevo = `huevosRotos` |
+| `K-303` · en el juego | «¡Galeota te pasa!», «¡Pasas a Trainera!», «¡Miniturbo!», «¡Te han dado!», «Te has ahogado en la salida», «¡Racha de viento!» |
+| `K-001` · el arnés lee `est.avisos` | KG1–KG5 **idénticos** a los de su cuenta propia de K2 |
 
 ---
 
@@ -283,9 +295,24 @@ FOV en 76° y con turbo en 82°.
 |---|---|---|
 | ~~**KQ1**~~ | **Resuelta 2026-09-23: acelerar el reloj (`K-101`).** ¿Acelerar el reloj (`K-101`, lo propuesto) o reescalar la física para que las barcas vayan de verdad a 9 m/s? Reescalar obliga a reescribir `B-202`, `B-203` y buena parte de `realismo.test.ts`, y los números de CLAUDE.md («una barca de 12 m alcanza 4,33 m/s») dejarían de ser ciertos. El reloj no toca nada de eso | K1 |
 | ~~**KQ2**~~ | **Resuelta 2026-09-23: tres vueltas cortas, también en Punta Tormenta (hoy 2).** ¿Tres vueltas cortas o dos largas? El kart usa tres; con tres, cada vuelta de la ría se queda en unos 500 m | K1 |
-| **KQ3** | ¿Mostrar la velocidad en el tablero (nudos o km/h)? Ayuda a sentirla, pero sería la velocidad de pantalla, no la del motor | K3 |
+| ~~**KQ3**~~ | **Cerrada 2026-09-23 sin hacer: queda en «Trabajo identificado y no realizado».** K3 transmite la velocidad con el FOV y los avisos. ¿Mostrar la velocidad en el tablero (nudos o km/h)? Ayuda a sentirla, pero sería la velocidad de pantalla, no la del motor | — |
 
 ---
+
+## Resumen de cierre — 2026-09-23
+
+| Objetivo | Umbral | Resultado |
+|---|---|---|
+| **KG1** · duración | mediana 2,5–4 min, peor circuito ≤ 5 | **3,8 min**, peor **3,9** (antes 12,4 y 17,4) |
+| **KG2** · velocidad en pantalla | ≥ 8 m/s en los cuatro | **12,17–13,08 m/s** (antes 4,0–4,4) |
+| **KG3** · hueco sin acontecimiento | mediana ≤ 12 s, p90 ≤ 20 s | **10 s**, p90 **11 s** (antes 47 s de mediana) |
+| **KG4** · pelea | ≥ 1,5 adelantamientos/min | **2,16** (antes 0,29) |
+| **KG5** · la habilidad se nota | 3–10 % en los cuatro | **3,1–8,2 %** |
+| **KG6** · el astillero sigue teniendo sentido | baseline en verde | victoria más alta **31 %**, 2.º a **1,23 s**, **5,0** adelantamientos sufridos |
+
+**Defectos corregidos: 6 de 6** (`DK1`–`DK6`). Tres especificaciones cerradas se tocaron por el
+camino, con su cambio escrito antes que el código: `H-102` y `H-105` de SPEC-002 y `R-503` de
+SPEC-004.
 
 ## Lo que la medición cambió respecto a lo escrito
 
@@ -303,6 +330,21 @@ Se escribe según se mide, no al cerrar: el texto de `K-101` y `K-102` ya remite
 | `KG3` | «Peor ≤ 20 s» sobre las 32 regatas | **El máximo mide el sorteo.** Durante el ajuste de K2, 31 regatas quedaban en 8–21 s y una, `ria/3`, daba **27 s**: el piloto medio lleva un kraken en la mano al final de la regata, sin nadie a 55 m, así que ni lo suelta ni puede coger huevo (`H-103`). Es la lección de `B-704` y de `HG3` otra vez: se exige el **percentil 90**. Con K2 entero (incluida la reaparición de `H-105` a 1 s): mediana **10 s**, percentil 90 **11 s**, máximo **25 s** |
 | `K-001` | «`--original` reproduce las cifras de §3» | **Solo mientras los huevos eran los de antes.** `--original` restaura los circuitos y el `RITMO` 1, pero los huevos salen de las reglas de hoy: filas cada 110 m (`K-201`) y reaparición a 1 s (`H-105`). Medido en K3: 12,3 min, hueco de **30 s** (no 47) y **2,28** objetos/min (no 1,39). La reproducción exacta de §3 del cierre de K1 se midió antes de aplicar `K-201`, y el bloque de resultados no lo decía. Se deja así —los huevos de antes no tienen sentido en el juego de ahora— y `--original` queda como «circuitos y ritmo de antes» |
 | `DK5` | 0,44 adelantamientos sufridos por minuto | Es la cifra del baseline (parrilla rotada). Con el muestreo de `K-001` (chalana sin tripulación) son **0,08 sufridos + 0,21 ganados = 0,29 por minuto**. KG4 se mide con este último |
+
+---
+
+## Trabajo identificado y no realizado
+
+Se replica en la tabla de [`index.md`](index.md).
+
+| Qué | De dónde sale | Por qué no está hecho |
+|---|---|---|
+| Tres vueltas por regata | `KQ2` | Solo caben recortando la geometría, y eso rompe `B-202`. Habría que rediseñar los circuitos |
+| Que la ceñida premie la habilidad en mar abierto | `KG5` | Faro y tormenta: 3,1–3,4 %, justo por encima del umbral |
+| Indicador de carga del miniturbo | `K-203` | No lo pedía ningún requisito. En un móvil no se ve que se está cargando hasta que salta |
+| La barra de aliento llama «racha de viento» también al miniturbo y al turbo de salida | `H-303` · `K-203` | `Aliento.tsx` nombra el efecto, no su origen |
+| La velocidad en el tablero | `KQ3` | Cerrada sin hacer |
+| El panel `?diagnostico=1` queda tapado por los botones en un móvil | `R-602` | Ya pasaba antes de SPEC-006 |
 
 ---
 
@@ -351,4 +393,4 @@ export function fovPara(vPantalla: number, vCascoPantalla: number, turbo: boolea
 | DK3 · 47 s sin que pase nada | K-201, K-202, K-203 | K1/K2 | ✅ 10 s (p90 11) | `[K-201]` · `npm run diversion` |
 | DK4 · 1,39 objetos/min | K-201 | K1 | ✅ 6,78/min | `[K-201]` · `npm run objetos-audit` |
 | DK5 · 0,44 adelantamientos/min | K-203, K-204, K-303 | K2/K3 | ✅ 2,16/min | `npm run diversion` |
-| DK6 · FOV nunca pasa de 72° | K-301 | K3 | 📋 | `[K-301]` |
+| DK6 · FOV nunca pasa de 72° | K-301 | K3 | ✅ 76° / 82° | `[K-301]` |
