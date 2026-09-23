@@ -38,6 +38,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | **Por qué un circuito tiene que girar una vuelta entera** y por qué un metro del motor es un metro del mundo | `004` §5 `R-105`/`R-106` · §3 `DR6`/`DR7` — **míralo antes de tocar `datos/circuitos.ts`** |
 | **El agua: olas de Gerstner, espuma, estela** | `004` §5 `R-2xx` — **§1.1 primero**: por qué no es un plano con una normal map |
 | Malla de la barca, cabeceo, balanceo, remos | `004` §5 `R-3xx` |
+| **Forma del casco, interior, remeros, vela** (el modelo 3D de la barca) | `004` §5 `R-308`–`R-311` · §3 `DR13`–`DR16` |
 | Cielo, costa, islas, boyas, niebla | `004` §5 `R-4xx` |
 | **Aspecto: reflejos, espuma, resplandor, sombras, post-proceso** | `004` §5 `R-206`–`R-209` · `R-505`/`R-506` · §3 `DR8`–`DR12` |
 | **Cámara, luz, encuadre** | `004` §5 `R-5xx` — **`R-501` antes de tocar el encuadre** |
@@ -58,7 +59,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | [SPEC-001](001-motor-de-regata.md) | El motor de regata | `B-` | ✅ COMPLETADA (Fases B1 y B2) |
 | [SPEC-002](002-huevos-y-objetos.md) | Los huevos y los objetos | `H-` | ✅ COMPLETADA (Fase H1) |
 | [SPEC-003](003-astillero-y-tripulacion.md) | El astillero y la tripulación | `A-` | ✅ COMPLETADA (Fase A1) |
-| [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1 y R2) |
+| [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1, R2 y R3) |
 | [SPEC-005](005-progreso-y-despliegue.md) | Progreso, aplicación y despliegue | `P-` | ✅ COMPLETADA (Fase P1) |
 
 ---
@@ -91,6 +92,5 @@ Se anota aquí para que no se pierda. No es una promesa de calendario.
 | Multijugador en el mismo dispositivo (pantalla partida) | `004` `RQ1` | La vista es una sola cámara (`R-501`); partirla obliga a duplicar el post-proceso |
 | Partidas en la nube y varios dispositivos | `005` `PQ1` | Hoy el progreso es local (`P-101`) y el juego funciona sin servidor |
 | Sonido: remos, agua, choques, la bocina de meta | — | No hay especificación todavía. Sigue el protocolo de `WORKFLOW.md` §2 |
-| La vela del jugador no se ve nunca | `004` `R-302` | Va en el plano de crujía y la cámara mira desde popa, así que se ve de canto. Las de las rivales sí se ven, que es para lo que están |
 | El arnés de capturas dibuja por software y no mide fotogramas de verdad | `004` `RG2` | SwiftShader en el contenedor. Lo que sí mide son llamadas de dibujo, triángulos y **lo que se ve**, que es lo que encontró `DR1`, `DR6` y `DR7` |
 | Olas de Gerstner que empujen de verdad a la barca | `004` `RQ2` | Hoy el oleaje del motor (`B-207`) y el del render (`R-201`) son dos cuentas distintas: se ven iguales pero no lo son |
