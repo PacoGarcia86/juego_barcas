@@ -97,9 +97,10 @@ src/render/          3D real sobre WebGL 2 (three.js)
   tresd/
     trazado.ts       Circuito → eje en el mundo. PURO, sin three   [R-1xx]
     agua.ts          Malla de Gerstner, espuma y estela            [R-2xx]
-    barca.ts         Malla procedural de casco, vela y remos       [R-3xx]
+    barca.ts         La lancha (de modelos.ts), trima de proa      [R-3xx]
+    modelos.ts       GENERADO desde arte/barcas/ (Blender). No editar [R-303]
     mundo.ts         Cielo, costa, islas, boyas, niebla            [R-4xx]
-    flota.ts         Las ocho barcas en pocas llamadas de dibujo   [R-3xx]
+    flota.ts         Las ocho lanchas en una llamada de dibujo     [R-3xx]
     vista.ts         Renderizador y cámara. Lo único que toca GL   [R-5xx]
 
 src/juego/motor.ts   Costura entre el motor y React                [R-6xx]
