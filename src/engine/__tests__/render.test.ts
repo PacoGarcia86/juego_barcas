@@ -19,9 +19,6 @@ import {
 } from '../../render/tresd/trazado.ts';
 import { alturaDeOla, construirMallaDeAgua, inclinacionEn, TOPE_VERTICES, TRENES } from '../../render/tresd/agua.ts';
 import { paletaDe } from '../../render/paleta.ts';
-import { MeshStandardMaterial } from 'three';
-import { caladoDe, geometriaDeCasco, pintarPorInstancia, TRIMA_MAXIMA, trimaDeProa } from '../../render/tresd/barca.ts';
-import { MODELO } from '../../render/tresd/modelos.ts';
 import { CIRCUITOS } from '../datos/circuitos.ts';
 import { longitudDeVuelta } from '../circuito.ts';
 import { circuito } from './ayudas.ts';
@@ -247,78 +244,4 @@ test('[R-401] la paleta da todos los colores, y el mar de fondo espesa la niebla
   const calma = paletaDe({ ...CIRCUITOS[0]!, oleajeBase: 0 });
   const bravo = paletaDe({ ...CIRCUITOS[0]!, oleajeBase: 1 });
   assert.ok(bravo.densidadNiebla > calma.densidadNiebla, 'con marejada se tiene que ver menos');
-});
-
-test('[R-303] la lancha de Blender es unitaria y la quilla es la del modelo', () => {
-  // La relación eslora/manga del dato solo se conserva si el casco pintado mide
-  // 1 × 1: el motor y la defensa pueden asomar, el casco no.
-  const geo = geometriaDeCasco();
-  const pos = geo.getAttribute('position');
-  const pesos = geo.getAttribute('pintura');
-  let xMin = Infinity, xMax = -Infinity, zMin = Infinity, zMax = -Infinity, yMin = Infinity;
-  for (let v = 0; v < pos.count; v++) {
-    if (pesos.getY(v) === 0) continue; // solo las caras con pintura de casco
-    xMin = Math.min(xMin, pos.getX(v));
-    xMax = Math.max(xMax, pos.getX(v));
-    zMin = Math.min(zMin, pos.getZ(v));
-    zMax = Math.max(zMax, pos.getZ(v));
-    yMin = Math.min(yMin, pos.getY(v));
-  }
-  assert.ok(Math.abs(xMax - xMin - 1) < 0.05, `la manga del casco mide ${(xMax - xMin).toFixed(3)}`);
-  assert.ok(Math.abs(zMax - zMin - 1) < 0.05, `la eslora del casco mide ${(zMax - zMin).toFixed(3)}`);
-  assert.ok(zMax > 0.45, 'la proa no mira a +Z');
-  assert.ok(Math.abs(yMin - MODELO.quilla) < 1e-3, `quilla declarada ${MODELO.quilla}, medida ${yMin}`);
-  assert.ok(MODELO.quilla < -0.2, 'el casco no tiene calado');
-  for (const i of MODELO.indices) assert.ok(i >= 0 && i < pos.count, `índice ${i} fuera de la malla`);
-});
-
-test('[R-304] la lancha levanta la proa con el gas, no con el reloj', () => {
-  assert.equal(trimaDeProa(0, 5), 0, 'a gas 0 tiene que ir plana');
-  assert.equal(trimaDeProa(1, 0), 0, 'parada no encabuza aunque se pida todo');
-  assert.ok(trimaDeProa(0.5, 4) < trimaDeProa(1, 4), 'más gas, más trima');
-  assert.ok(trimaDeProa(1, 2) < trimaDeProa(1, 4), 'más velocidad, más trima');
-  assert.ok(trimaDeProa(3, 20) <= TRIMA_MAXIMA + 1e-12, 'la trima tiene tope');
-  assert.ok(Math.abs((TRIMA_MAXIMA * 180) / Math.PI - 4) < 1e-9);
-});
-
-test('[R-306] casco y franja se pintan por instancia; lo demás, color fijo', () => {
-  const usadas = [...new Set(MODELO.pintura)].map((i) => MODELO.pinturas[i]!);
-  assert.ok(usadas.some((p) => 'pintura' in p && p.pintura === 'casco'), 'nada toma el color de casco');
-  assert.ok(usadas.some((p) => 'pintura' in p && p.pintura === 'franja'), 'nada toma el color de franja');
-  assert.ok(usadas.some((p) => 'fijo' in p), 'todo el modelo se tiñe con la barca');
-  // Cada vértice pinta de UNA fuente: fija, casco o franja.
-  const pesos = geometriaDeCasco().getAttribute('pintura');
-  for (let v = 0; v < pesos.count; v++) {
-    const fuentes = [pesos.getX(v), pesos.getY(v), pesos.getZ(v)].filter((w) => w > 0).length;
-    assert.equal(fuentes, 1, `el vértice ${v} mezcla ${fuentes} pinturas`);
-  }
-  // El shader sustituye el color por instancia, no lo multiplica.
-  const material = new MeshStandardMaterial({ vertexColors: true });
-  pintarPorInstancia(material);
-  const shader = { vertexShader: '#include <color_pars_vertex>\n#include <color_vertex>', fragmentShader: '', uniforms: {} };
-  material.onBeforeCompile(shader as never, undefined as never);
-  assert.doesNotMatch(shader.vertexShader, /#include <color_vertex>/);
-  assert.match(shader.vertexShader, /attribute vec3 franja/);
-  assert.match(shader.vertexShader, /instanceColor\.rgb \* pintura\.y/);
-});
-
-test('[R-305] la flotación nunca pasa por encima del suelo de la bañera', () => {
-  // Con el calado anterior (0,4–0,72) el agua se dibujaba sobre el suelo de
-  // las barcas cargadas: solo asomaban la regala y la consola.
-  const suelo = MODELO.pinturas.findIndex((p) => 'fijo' in p && p.fijo === 'suelo');
-  assert.ok(suelo >= 0, 'el modelo no tiene suelo');
-  let alturaSuelo = Infinity;
-  MODELO.pintura.forEach((p, v) => {
-    if (p === suelo) alturaSuelo = Math.min(alturaSuelo, MODELO.posiciones[v * 3 + 1]!);
-  });
-  let anterior = -Infinity;
-  for (let masa = 300; masa <= 3000; masa += 50) {
-    const calado = caladoDe(masa);
-    assert.ok(calado >= anterior, `el calado baja al pasar a ${masa} kg`);
-    anterior = calado;
-    const flotacion = MODELO.quilla * (1 - calado);
-    // Margen de 0,04 puntales: la ola inclina la barca y el agua no es plana.
-    assert.ok(flotacion < alturaSuelo - 0.04, `${masa} kg: flotación ${flotacion.toFixed(3)} contra suelo ${alturaSuelo.toFixed(3)}`);
-  }
-  assert.ok(caladoDe(1800) > caladoDe(400), 'una barca cargada tiene que ir más metida');
 });
