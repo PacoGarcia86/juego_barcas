@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | SPEC-006 |
 | **Título** | Una regata dura tres minutos y pasa algo cada pocos segundos, sin romper el compromiso de los cascos |
-| **Estado** | 🚧 `EN CURSO` (Fase K1 ✅ cerrada 2026-09-23 · Fase K2 en curso) |
+| **Estado** | 🚧 `EN CURSO` (Fases K1 y K2 ✅ cerradas 2026-09-23 · Fase K3 en curso) |
 | **Autor** | — |
 | **Creado** | 2026-09-23 |
 | **Módulos afectados** | `src/engine/{carrera,huevos,ia,objetos}.ts`, `src/engine/datos/circuitos.ts`, `src/juego/motor.ts`, `src/render/tresd/vista.ts`, `src/components/{Tablero,Mando}.tsx`, `scripts/` |
@@ -230,7 +230,7 @@ tests y build limpios.
 | `K-102` · tramos contra la copia de antes | **idénticos** en los 4 circuitos; `R-105`/`R-106` en verde sin tocarlos |
 | `K-201` · paso real entre filas | **101–106 m** (ceil de vuelta/110) |
 
-### Fase K2 — Acción
+### Fase K2 — Acción · ✅ **CERRADA 2026-09-23**
 **Alcance:** `K-202`, `K-203`, `K-204`, y `H-105` de SPEC-002 (reaparición a 1 s: lo pidió la
 medición, ver «Lo que la medición cambió»). El piloto medio del arnés (`scripts/piloto.ts`) aprende a
 salir: pisa el gas en un momento sorteado del último segundo y pico, así que a veces clava la
@@ -238,6 +238,24 @@ salida y a veces se ahoga. Sin eso se ahogaría en todas, porque hoy pide gas de
 El piloto experto de KG5 clava la salida y ciñe cada curva en la que puede.
 **Puerta:** **KG3**, **KG4** y **KG5** en `npm run diversion`; **KG6** en `npm run baseline`;
 `npm run objetos-audit` en verde.
+**Resultado:** 183 tests en verde (13 nuevos en `kart.test.ts`) · `tsc --noEmit` limpio ·
+`vite build` correcto · `diversion` (KG1–KG5), `baseline` y `objetos-audit` superados.
+
+| Comprobación | Resultado |
+|---|---|
+| `KG1` · duración | **3,8 min** de mediana, peor circuito **3,9** |
+| `KG2` · flota en pantalla | **12,17–13,08 m/s** |
+| `KG3` · hueco sin acontecimiento | mediana **10 s**, percentil 90 **11 s**, máximo 25 s (umbral ≤ 12 y p90 ≤ 20) |
+| `KG4` · pelea | **2,16** adelantamientos/min (antes de SPEC-006 0,29; tras K1 1,10). Umbral ≥ 1,5 |
+| `KG5` · experto contra medio | ria **8,2 %** · faro **3,1 %** · canal **7,1 %** · tormenta **3,4 %** (umbral 3–10 % en los cuatro) |
+| `KG6` · baseline, velocidad media | **4,07–4,76 m/s** de simulación |
+| `KG6` · baseline, diferencia del 2.º | mediana **1,23 s**, peor **1,8 %** del ganador |
+| `KG6` · baseline, adelantamientos sufridos | media **5,0**, rango 0–14 (umbral 3–12) |
+| `KG6` · baseline, reparto | patín **31 %**, galeota 19 %, trainera 12 %, neumática 7 %, lancha 7 %, chalana 0 % (umbral < 45 %; las cinco de pago ganan alguna) |
+| `HG3` · huevos del jugador, mínimo | **17** (umbral ≥ 12) |
+| `K-202` · salida a −0,3 / −1,5 s / sin tocar | turbo / ahogo / nada; reloj en 0 durante la cuenta |
+| `K-203` · carga 0,5 / 1,0 / 2,0 s | nada / turbo ×6 de 1,2 s / de 2,4 s; salir de la curva lo dispara |
+| `K-204` · salidas clavadas en 40 sorteos | dentro de ±15 puntos de 80 / 60 / 45 / 35 % |
 
 ### Fase K3 — Que se note
 **Alcance:** `K-301`, `K-302`, `K-303`
@@ -326,7 +344,7 @@ export function fovPara(vPantalla: number, vCascoPantalla: number, turbo: boolea
 |---|---|---|---|---|
 | DK1 · 12,4 min por regata | K-101, K-102 | K1 | ✅ 3,7 min | `[K-102]` · `npm run diversion` |
 | DK2 · 4,1–4,8 m/s | K-101 | K1 | ✅ 12,1–13,0 m/s | `[K-101]` · `npm run diversion` |
-| DK3 · 47 s sin que pase nada | K-201, K-202, K-203 | K1/K2 | 🟡 10 s tras K1 | `[K-201]` · `npm run diversion` |
+| DK3 · 47 s sin que pase nada | K-201, K-202, K-203 | K1/K2 | ✅ 10 s (p90 11) | `[K-201]` · `npm run diversion` |
 | DK4 · 1,39 objetos/min | K-201 | K1 | ✅ 6,78/min | `[K-201]` · `npm run objetos-audit` |
-| DK5 · 0,44 adelantamientos/min | K-203, K-204, K-303 | K2/K3 | 📋 | `npm run diversion` |
+| DK5 · 0,44 adelantamientos/min | K-203, K-204, K-303 | K2/K3 | ✅ 2,16/min | `npm run diversion` |
 | DK6 · FOV nunca pasa de 72° | K-301 | K3 | 📋 | `[K-301]` |
