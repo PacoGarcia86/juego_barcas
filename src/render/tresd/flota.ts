@@ -321,6 +321,8 @@ export class Flota {
   /** [R-311] Ángulo de cada botavara con el plano de crujía, para los tests. */
   private readonly escotas: number[];
   private ultimaOla = { tiempo: 0, oleaje: 0 };
+  /** [K-302] Vuelta sobre sí misma de cada barca con `giro`, en radianes. */
+  private readonly giros: number[] = [];
 
   constructor(naves: readonly Nave[], paleta: Paleta) {
     this.fases = naves.map(() => 0);
@@ -454,10 +456,18 @@ export class Flota {
         const nave = naves[i];
         if (nave === undefined) return;
         const sitio3 = this.situar(nave, trazado, tiempo, oleaje);
+        // [K-302] Con `giro` la barca da vueltas sobre sí misma; al acabar se
+        // endereza por el camino corto hasta la vuelta entera más cercana, que
+        // es su rumbo: sin salto.
+        const vuelta = 2 * Math.PI;
+        let giro = this.giros[i] ?? 0;
+        if (nave.efectos.some((ef) => ef.tipo === 'giro')) giro += dt * vuelta * 1.6;
+        else giro += (Math.round(giro / vuelta) * vuelta - giro) * Math.min(1, dt * 8);
+        this.giros[i] = giro;
         // Un giro POSITIVO en X baja la proa (+Z), y `cabeceo` es positivo con
         // la proa ARRIBA: por eso va con el signo cambiado. Con el signo de
         // serie las barcas cabeceaban al revés que la ola que tenían debajo.
-        e.set(-sitio3.cabeceo, sitio3.rumbo, sitio3.balanceo, 'YXZ');
+        e.set(-sitio3.cabeceo, sitio3.rumbo + giro, sitio3.balanceo, 'YXZ');
         qCasco.setFromEuler(e);
         // [R-305] El calado sube con el desplazamiento: una barca cargada va
         // más metida en el agua, y se ve.
@@ -584,8 +594,9 @@ export class Flota {
     const avance = nave.cambiando > 0 ? 1 - nave.cambiando / 1.2 : 1;
     const carril = nave.cambiando > 0 ? nave.carril + (nave.carrilDestino - nave.carril) * avance : nave.carril;
     const lateral = lateralDe(carril, carriles, anchura);
-    const x = p.x + Math.cos(rumbo) * lateral;
-    const z = p.z - Math.sin(rumbo) * lateral;
+    // [K-101] A estribor es (−cos, +sin): la misma cuenta que `posicionEn`.
+    const x = p.x - Math.cos(rumbo) * lateral;
+    const z = p.z + Math.sin(rumbo) * lateral;
     const y = alturaDeOla(x, z, tiempo, oleaje);
     const { cabeceo, balanceo } = inclinacionEn(x, z, rumbo, nave.barca.eslora, nave.barca.manga, tiempo, oleaje);
     return { x, y, z, rumbo, cabeceo: cabeceo * 0.85, balanceo: balanceo * 0.7 };

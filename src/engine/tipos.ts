@@ -111,7 +111,11 @@ export interface Tramo {
   longitud: number;
   /** Metros de ancho navegable. Fija los carriles [B-103]. */
   anchura: number;
-  /** Radio de la curva en metros. Positivo = a estribor. 0 en las rectas. */
+  /**
+   * Radio de la curva en metros. 0 en las rectas. **Positivo = a babor**: su
+   * interior es el carril 0, y el carril +1 queda a estribor (`Mando.timon`).
+   * El comentario decía «a estribor» y contradecía a los otros dos [K-101].
+   */
   radio: number;
   /** [B-106] m/s con signo: positivo empuja en el sentido de la marcha. */
   corriente: number;
@@ -227,6 +231,12 @@ export interface Nave {
   /** [H-103] Solo con vigía a bordo. */
   guardado: TipoObjeto | null;
   efectos: Efecto[];
+
+  /**
+   * [K-204] Segundos de regata que lleva ciñendo la boya: en curva, por el
+   * carril interior y apretando el timón hacia dentro. Al soltar, turbo.
+   */
+  cenida: number;
 
   vuelta: number;
   huevosRotos: number;

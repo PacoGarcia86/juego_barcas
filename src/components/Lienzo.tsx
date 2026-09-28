@@ -4,16 +4,20 @@
 import { useEffect, useRef } from 'react';
 import type { EstadoRegata } from '../engine/tipos.ts';
 import { Vista, type Diagnostico } from '../render/tresd/vista.ts';
+import { CENIDA_NIVEL_1, CENIDA_NIVEL_2 } from '../engine/carrera.ts';
+import { REAPARICION } from '../engine/huevos.ts';
 
 interface Props {
   /** Se llama en cada fotograma con el tiempo real transcurrido. */
   alFotograma: (dt: number) => EstadoRegata;
   inicial: EstadoRegata;
   seguido: number;
+  /** [K-201] Segundos de regata por segundo real: lo necesita la cámara. */
+  ritmo: number;
   onDiagnostico?: (d: Diagnostico) => void;
 }
 
-export default function Lienzo({ alFotograma, inicial, seguido, onDiagnostico }: Props) {
+export default function Lienzo({ alFotograma, inicial, seguido, ritmo, onDiagnostico }: Props) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   // Las funciones se leen por referencia para que el bucle no se reinicie en
   // cada render de React: un bucle que se reinicia pierde el acumulador y con
@@ -31,7 +35,8 @@ export default function Lienzo({ alFotograma, inicial, seguido, onDiagnostico }:
 
     let vista: Vista;
     try {
-      vista = new Vista(elemento, inicial);
+      // [H-209] El render no importa valores del motor: se los da quien lo monta.
+      vista = new Vista(elemento, inicial, ritmo, { cenida: [CENIDA_NIVEL_1, CENIDA_NIVEL_2], reaparicion: REAPARICION });
     } catch {
       // Sin WebGL 2 no hay juego en 3D, pero tampoco pantalla en blanco.
       const aviso = document.createElement('p');

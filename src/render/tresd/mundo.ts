@@ -26,7 +26,7 @@ import {
   Vector3,
 } from 'three';
 import type { Circuito, Huevo } from '../../engine/tipos.ts';
-import { direccionDelSol, type Paleta } from '../paleta.ts';
+import { ARCADE, direccionDelSol, type Paleta } from '../paleta.ts';
 import { anchuraEn, posicionEn, puntoEn, rumboEn, type Trazado } from './trazado.ts';
 import { alturaDeOla } from './agua.ts';
 
@@ -244,16 +244,37 @@ export class Mundo {
     this.raiz.add(this.boyas, this.lucesBoya);
 
     // -- Huevos [R-403] [R-408] --------------------------------------------
-    const geoHuevo = new SphereGeometry(0.55, 20, 14);
+    // [K-307] Un 30 % más grandes y pintados: franjas en zigzag por vértice y
+    // un color del arcoíris por instancia. Se leen como cajas de objeto, y la
+    // flota de huevos sigue siendo UNA llamada de dibujo.
+    const geoHuevo = new SphereGeometry(0.72, 24, 16);
     geoHuevo.scale(1, 1.32, 1);
+    {
+      const pos = geoHuevo.getAttribute('position') as BufferAttribute;
+      const franjas = new Float32Array(pos.count * 3);
+      for (let i = 0; i < pos.count; i++) {
+        const y = pos.getY(i) / (0.72 * 1.32);
+        const zigzag = y + 0.1 * Math.sin(Math.atan2(pos.getZ(i), pos.getX(i)) * 7);
+        const blanca = Math.floor((zigzag + 1) * 3.5) % 2 === 0;
+        const v = blanca ? 1 : 0.28;
+        franjas.set([v, v, v], i * 3);
+      }
+      geoHuevo.setAttribute('color', new BufferAttribute(franjas, 3));
+    }
     const matHuevo = new MeshStandardMaterial({
       color: new ColorTres(paleta.huevo),
-      roughness: 0.25,
+      vertexColors: true,
+      roughness: 0.2,
       emissive: new ColorTres(paleta.huevo),
-      emissiveIntensity: 0.9,
+      emissiveIntensity: 0.28,
     });
     this.aDestruir.push(geoHuevo, matHuevo);
     this.huevos = new InstancedMesh(geoHuevo, matHuevo, Math.max(1, huevos.length));
+    const tono = new ColorTres();
+    for (let i = 0; i < this.huevos.count; i++) {
+      tono.setHSL((i * 0.137) % 1, ARCADE.huevoSaturacion, ARCADE.huevoLuz);
+      this.huevos.setColorAt(i, tono);
+    }
     this.huevos.frustumCulled = false;
     this.huevos.castShadow = true;
     this.raiz.add(this.huevos);
@@ -371,7 +392,7 @@ export class Mundo {
       // otra, se vería en un carril y se rompería en otro.
       const carriles = Math.max(2, Math.floor(anchuraEn(this.trazado, h.metros) / 4.5));
       const { x, z } = posicionEn(this.trazado, h.metros, h.carril, carriles);
-      sitio.set(x, alturaDeOla(x, z, tiempo, oleaje) + 0.5 + Math.sin(tiempo * 2.2 + i) * 0.12, z);
+      sitio.set(x, alturaDeOla(x, z, tiempo, oleaje) + 0.7 + Math.sin(tiempo * 2.2 + i) * 0.12, z);
       q.setFromAxisAngle(eje, tiempo * 1.3 + i);
       m.compose(sitio, q, uno);
       this.huevos.setMatrixAt(i, m);

@@ -14,7 +14,8 @@ const NOMBRES: Record<Efecto['tipo'], string> = {
   burbuja: 'protegido',
 };
 
-export default function Aliento({ nave }: { nave: Nave }) {
+/** `ritmo` [K-201]: los segundos que se enseñan son los de juego, no los de regata. */
+export default function Aliento({ nave, ritmo }: { nave: Nave; ritmo: number }) {
   const color =
     nave.energia > 55 ? 'var(--color-bien)' : nave.energia > 25 ? 'var(--color-ojo)' : 'var(--color-mal)';
   return (
@@ -32,7 +33,7 @@ export default function Aliento({ nave }: { nave: Nave }) {
           <div className="mt-1 flex flex-wrap justify-center gap-1">
             {nave.efectos.map((e, i) => (
               <span key={i} className="tarjeta-plana px-2 py-0.5 text-[10px] text-tinta-300">
-                {NOMBRES[e.tipo]} · {e.restante.toFixed(1)} s
+                {NOMBRES[e.tipo]} · {(e.restante / ritmo).toFixed(1)} s
               </span>
             ))}
           </div>

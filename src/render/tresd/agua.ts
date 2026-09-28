@@ -82,10 +82,11 @@ export function inclinacionEn(
   const proaZ = z + Math.cos(rumbo) * (eslora / 2);
   const popaX = x - Math.sin(rumbo) * (eslora / 2);
   const popaZ = z - Math.cos(rumbo) * (eslora / 2);
-  const estriborX = x + Math.cos(rumbo) * (manga / 2);
-  const estriborZ = z - Math.sin(rumbo) * (manga / 2);
-  const baborX = x - Math.cos(rumbo) * (manga / 2);
-  const baborZ = z + Math.sin(rumbo) * (manga / 2);
+  // [K-101] A estribor es (−cos, +sin), como en `posicionEn`.
+  const estriborX = x - Math.cos(rumbo) * (manga / 2);
+  const estriborZ = z + Math.sin(rumbo) * (manga / 2);
+  const baborX = x + Math.cos(rumbo) * (manga / 2);
+  const baborZ = z - Math.sin(rumbo) * (manga / 2);
 
   const proa = alturaDeOla(proaX, proaZ, t, oleaje);
   const popa = alturaDeOla(popaX, popaZ, t, oleaje);
@@ -94,7 +95,10 @@ export function inclinacionEn(
 
   return {
     cabeceo: Math.atan2(proa - popa, eslora),
-    balanceo: Math.atan2(estribor - babor, manga),
+    // Un giro positivo en Z (proa en +Z) echa el palo hacia −X local, que es
+    // estribor: escora a estribor cuando el agua de estribor está más BAJA.
+    // Con los nombres cambiados daba lo mismo por casualidad [K-101].
+    balanceo: Math.atan2(babor - estribor, manga),
   };
 }
 
