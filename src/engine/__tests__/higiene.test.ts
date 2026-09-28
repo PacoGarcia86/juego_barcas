@@ -40,7 +40,8 @@ test('[B-901] Math.random está prohibido fuera de los tests', () => {
   // Toda la aleatoriedad pasa por `rng.ts`: una regata tiene que poder
   // repetirse exactamente para poder depurarla y para que el arnés mida lo
   // mismo dos veces.
-  for (const dir of ['src/engine', 'src/render', 'src/modes', 'src/components', 'src/juego']) {
+  // [V-401] También `sonido/`: el ruido del agua sale del PRNG.
+  for (const dir of ['src/engine', 'src/render', 'src/modes', 'src/components', 'src/juego', 'src/sonido']) {
     for (const f of ficheros(dir)) {
       if (f.includes('__tests__')) continue;
       assert.ok(!codigo(leer(f)).includes('Math.random'), `${relativo(f)} usa Math.random`);
@@ -63,6 +64,9 @@ test('[B-902] ninguna capa inferior conoce a la superior', () => {
     { dir: 'src/engine', prohibido: /from 'react'/, motivo: 'el motor no es React' },
     { dir: 'src/render', prohibido: /from '\.\.\/(components|modes|juego)\//, motivo: 'el render no conoce la interfaz' },
     { dir: 'src/render', prohibido: /from 'react'/, motivo: 'el render pinta, no monta componentes' },
+    // [V-405] El sonido es una capa hoja: solo puede tirar del motor (`rng.ts`).
+    { dir: 'src/sonido', prohibido: /from '\.\.\/(render|components|modes|juego)\//, motivo: 'el sonido no conoce la interfaz' },
+    { dir: 'src/sonido', prohibido: /from 'react'/, motivo: 'el sonido no es React' },
   ];
   for (const regla of reglas) {
     for (const f of ficheros(regla.dir)) {
@@ -176,5 +180,19 @@ test('[B-9xx] los ficheros del motor no crecen sin control', () => {
     if (f.includes('__tests__') || f.includes('/datos/')) continue;
     const lineas = leer(f).split('\n').length;
     assert.ok(lineas < 700, `${relativo(f)} tiene ${lineas} líneas`);
+  }
+});
+
+test('[V-401] el sonido se sintetiza: ni ficheros de audio ni descargas', () => {
+  for (const f of ficheros('src/sonido')) {
+    const fuente = codigo(leer(f));
+    for (const p of ['fetch(', 'new Audio(', 'decodeAudioData', 'XMLHttpRequest']) {
+      assert.ok(!fuente.includes(p), `${relativo(f)} usa ${p}`);
+    }
+  }
+  // Y no hay un solo fichero de audio en el proyecto.
+  for (const dir of ['src', 'public']) {
+    const audio = ficheros(dir, ['.mp3', '.ogg', '.wav', '.m4a', '.aac', '.flac']);
+    assert.deepEqual(audio.map(relativo), [], 'hay ficheros de audio');
   }
 });

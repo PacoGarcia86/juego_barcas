@@ -148,6 +148,35 @@ const HORAS: Record<Circuito['hora'], Paleta> = {
 };
 
 /**
+ * [V-2xx] [R-401] Los colores de lo que se lanza y de lo que te pasa. No
+ * cambian con la hora: un kraken es morado al amanecer y de noche. Van en sRGB
+ * como el resto; el render los pasa a lineal y los sube de 1 para el
+ * resplandor (`R-505`).
+ */
+export const ARCADE = {
+  /** [V-204] Ceñida: cargando, primer nivel, segundo nivel. */
+  chispaCarga: '#e8f0ff',
+  chispaNivel1: '#4fb4ff',
+  chispaNivel2: '#ff9a2e',
+  /** [V-202] La racha. */
+  racha: '#bfe8ff',
+  /** [V-207] La cáscara que salta al romper un huevo. */
+  cascara: '#ffd35a',
+  /** [V-201] */
+  kraken: '#5c1a6e',
+  ola: '#dff4ff',
+  anclaFlotador: '#d11a12',
+  anclaFranja: '#eeeeee',
+  anclaHierro: '#26282c',
+  /** [V-202] */
+  burbuja: '#9fdcff',
+  nube: '#c8cdd4',
+  /** [V-207] Saturación y luz del arcoíris de los huevos (el tono va por huevo). */
+  huevoSaturacion: 0.85,
+  huevoLuz: 0.58,
+} as const;
+
+/**
  * [R-401] La paleta de un circuito. El mar de fondo oscurece el agua y espesa
  * la niebla: con marejada se ve menos, y eso lo dice el color, no un aviso.
  */

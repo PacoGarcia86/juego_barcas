@@ -14,6 +14,7 @@
     "regata-humo": "node scripts/regata-humo.ts",
     "baseline": "node scripts/baseline.ts",
     "objetos-audit": "node scripts/objetos-audit.ts",
+    "vista-audit": "node scripts/vista-audit.ts",
     "diversion": "node scripts/diversion.ts"
   },
   "dependencies": {

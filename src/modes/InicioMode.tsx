@@ -29,6 +29,9 @@ export default function InicioMode({ partida, onCorrer, onAstillero, onBorrar }:
         <p className="mt-1 text-[13px] leading-snug text-tinta-200">
           Rompe los huevos que flotan —son gratis y salen otra vez—, aguanta la posición y llega el primero.
         </p>
+        <p className="mt-1 text-[11px] leading-snug text-tinta-100">
+          ◀ ▶ cambias de carril · ▲ a tope · espacio suelta el objeto · en la curva, aprieta hacia la boya para ceñir
+        </p>
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">

@@ -4,6 +4,7 @@
 import { useEffect, useRef } from 'react';
 import type { EstadoRegata } from '../engine/tipos.ts';
 import { Vista, type Diagnostico } from '../render/tresd/vista.ts';
+import type { UmbralesDeEfectos } from '../render/tresd/efectos.ts';
 
 interface Props {
   /** Se llama en cada fotograma con el tiempo real transcurrido. */
@@ -12,10 +13,12 @@ interface Props {
   seguido: number;
   /** [K-301] Ritmo y velocidad de casco de la barca seguida: la vista no los puede calcular. */
   encuadre: { ritmo: number; vCasco: number };
+  /** [H-209] [V-204] Umbrales del motor que el render no puede importar. */
+  umbrales: UmbralesDeEfectos;
   onDiagnostico?: (d: Diagnostico) => void;
 }
 
-export default function Lienzo({ alFotograma, inicial, seguido, encuadre, onDiagnostico }: Props) {
+export default function Lienzo({ alFotograma, inicial, seguido, encuadre, umbrales, onDiagnostico }: Props) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   // Las funciones se leen por referencia para que el bucle no se reinicie en
   // cada render de React: un bucle que se reinicia pierde el acumulador y con
@@ -33,7 +36,7 @@ export default function Lienzo({ alFotograma, inicial, seguido, encuadre, onDiag
 
     let vista: Vista;
     try {
-      vista = new Vista(elemento, inicial, encuadre);
+      vista = new Vista(elemento, inicial, encuadre, umbrales);
     } catch {
       // Sin WebGL 2 no hay juego en 3D, pero tampoco pantalla en blanco.
       const aviso = document.createElement('p');

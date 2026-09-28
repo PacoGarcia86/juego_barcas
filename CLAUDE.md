@@ -22,7 +22,7 @@ El flujo completo está en [`specs/WORKFLOW.md`](specs/WORKFLOW.md). Órdenes di
 Tres reglas que no se negocian:
 
 1. **Cada requisito tiene un ID estable** (`B-` SPEC-001, `H-` SPEC-002, `A-` SPEC-003,
-   `R-` SPEC-004, `P-` SPEC-005, `K-` SPEC-006). El código que lo cumple lleva `// [B-xxx]`; el test que lo prueba
+   `R-` SPEC-004, `P-` SPEC-005, `K-` SPEC-006, `V-` SPEC-007). El código que lo cumple lleva `// [B-xxx]`; el test que lo prueba
    se llama `[B-xxx] …`.
 2. **Un cambio de alcance se escribe en la especificación ANTES que en el código**, nunca después.
 3. **Ninguna afirmación sobre la regata sin medirla.** Si tocas la física, la IA, los objetos o el
@@ -40,7 +40,7 @@ rompas «temporalmente».
 
 | ID | Invariante |
 |---|---|
-| `[B-901]` | **Todo el azar pasa por `rng.ts`.** `Math.random` está prohibido en `engine/`, `render/`, `modes/`, `components/` y `juego/`. Misma semilla ⇒ misma regata, metro a metro. |
+| `[B-901]` | **Todo el azar pasa por `rng.ts`.** `Math.random` está prohibido en `engine/`, `render/`, `modes/`, `components/`, `juego/` y `sonido/`. Misma semilla ⇒ misma regata, metro a metro. |
 | `[B-902]` | **Ninguna capa inferior conoce a la superior.** El motor no importa de `render/`, `components/`, `modes/` ni `react`. El render no importa React. |
 | `[B-903]` | **El motor no hace E/S.** Nada de `fetch`, `localStorage`, `document` ni `window`. [`progreso.ts`](src/engine/progreso.ts) es la única excepción declarada, y recibe el almacén por parámetro. |
 | `[B-904]` | **Restricciones del borrado de tipos.** `import type` para tipos, extensión `.ts` explícita, sin `enum` ni `namespace`. |
@@ -67,6 +67,7 @@ Al escribir cualquier fichero nuevo en `src/engine/` o `src/render/`:
 | `npm run baseline` | **Puerta obligatoria** de todo cambio de regata. Cuatro circuitos, cuatro columnas. |
 | `npm run regata-humo <circuito> <vueltas>` | Una regata con detalle: velocidades, estela, objetos, adelantamientos. |
 | `npm run objetos-audit` | Comprueba que la ruleta reparte lo que la ayuda promete y que ningún objeto se queda en vuelo. |
+| `npm run vista-audit` | Puerta de SPEC-007: timón y boyas del lado bueno en pantalla, y tu barca sin tapar. |
 | `npm run diversion` | Duración, velocidad de pantalla, huecos sin acontecimiento y pelea por minuto (SPEC-006). `--fase K1`, `--original`. |
 | `npm run icons` | Regenera los iconos de la aplicación instalable. |
 
@@ -98,24 +99,27 @@ src/engine/
 src/render/          3D real sobre WebGL 2 (three.js)
   paleta.ts          Hora y mar → todos los colores                [R-401]
   tresd/
-    trazado.ts       Circuito → eje en el mundo. PURO, sin three   [R-1xx]
+    trazado.ts       Circuito → eje en el mundo. PURO, sin three   [R-1xx][V-101]
     agua.ts          Malla de Gerstner, reflejo, espuma            [R-2xx]
     cielo.ts         Sol, nubes y estrellas. El agua lo refleja    [R-406]
     barca.ts         Malla procedural de casco, vela y remos       [R-3xx]
     mundo.ts         Cielo, costa, islas, boyas, niebla            [R-4xx]
     flota.ts         Las ocho barcas en pocas llamadas de dibujo   [R-3xx]
+    efectos.ts       Objetos en vuelo, efectos, partículas         [V-2xx]
     encuadre.ts      FOV por velocidad de pantalla. PURO, sin three [K-301]
     vista.ts         Renderizador, cámara y post-proceso HDR       [R-5xx]
 
 src/juego/motor.ts   Costura entre el motor y React                [R-6xx]
-src/components/      Lienzo · Tablero · Mando · FichaBarca
+src/juego/sucesos.ts Vuelta, última vuelta, objeto y meta. PURO    [V-304]
+src/sonido/          Web Audio sintetizado. Capa hoja               [V-4xx]
+src/components/      Lienzo · Tablero · Mando · FichaBarca · Cuenta · Avisos · Anuncios · Clasificacion
 src/modes/           Inicio · Regata · Astillero · Resultado
 ```
 
 **Los datos viven en `src/engine/datos/`** y son declarativos: cambiar el precio de una barca o el
 oleaje de un circuito es cambiar una línea, nunca tocar lógica.
 
-## Cinco cosas que parecen obvias y no lo son
+## Seis cosas que parecen obvias y no lo son
 
 - **La eslora larga no es «mejor», es un compromiso** (`B-202`). La velocidad de casco vale
   `1,25·√eslora`: una barca de 12 m alcanza 4,33 m/s antes de que la resistencia de ola se dispare,
@@ -138,3 +142,7 @@ oleaje de un circuito es cambiar una línea, nunca tocar lógica.
   desplazamiento, y el desplazamiento entra en la resistencia. Llenar las cinco plazas de remeros
   es más lento que cuatro remeros y un timonel en todos los circuitos con curvas. Está medido en
   SPEC-003 §3 `DA3`.
+- **«A estribor» en el mundo es `(−cos r, +sin r)`, no `(cos r, −sin r)`** (`V-101`). Con el
+  segundo, el timón iba al revés en pantalla y las catorce boyas se dibujaban por fuera de su
+  curva, y ningún test lo veía porque todos medían distancias, que son simétricas. Cualquier
+  vector perpendicular al rumbo nuevo pasa por `posicionEn` o por `derechaDePantalla`.

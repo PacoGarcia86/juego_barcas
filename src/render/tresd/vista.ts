@@ -27,28 +27,27 @@ import type { Circuito, EstadoRegata } from '../../engine/tipos.ts';
 import { paletaDe, type Paleta } from '../paleta.ts';
 import { Agua } from './agua.ts';
 import { Cielo, uniformesDeCielo, type UniformesCielo } from './cielo.ts';
+import { Efectos, type UmbralesDeEfectos } from './efectos.ts';
 import { Flota } from './flota.ts';
 import { Mundo } from './mundo.ts';
 import { FOV_PARADO, fovPara } from './encuadre.ts';
-import { construirTrazado, lateralDe, posicionEn, puntoDeMira, puntoEn, rumboEn, type Trazado } from './trazado.ts';
+import {
+  alturaDeCamara,
+  construirTrazado,
+  posicionEn,
+  puntoDeMira,
+  retrasoDeCamara,
+  type Trazado,
+} from './trazado.ts';
 
 /**
- * [R-501] Metros por detrás de la barca seguida.
- *
- * Son 26 y no 14. Con 14 la cámara se metía DENTRO de la barca: una galeota
- * mide 14,5 m de eslora, así que el retraso era menor que la propia barca y lo
- * único que se veía era su propia cubierta llenando la pantalla.
+ * [R-501] [V-102] El retraso y la altura de la cámara salen de la eslora, en
+ * `trazado.ts` (`retrasoDeCamara`, `alturaDeCamara`), que se prueba con
+ * números. Con los 13 + 1,15·eslora m de antes cabía una barca entera entre la
+ * cámara y la tuya, y había rival en primer plano hasta el 47 % de la regata.
  */
-const RETRASO_BASE = 13;
-/**
- * [R-501] El retraso CRECE con la eslora. Una galeota mide 14,5 m: con un
- * retraso fijo de 14 m la cámara se metía dentro de la barca y llenaba la
- * pantalla con su propia cubierta, y con uno fijo de 26 m una chalana de 6 m
- * quedaba tan lejos que no se distinguía de las rivales.
- */
-const RETRASO_POR_ESLORA = 1.15;
-/** [R-501] Altura de la cámara sobre el agua. A ras de agua no se ve el circuito. */
-const ALTURA = 5.8;
+/** [V-103] Lo que dura y lo que mueve la sacudida de un golpe. */
+const SACUDIDA = { duracion: 0.35, amplitud: 0.3 };
 /** [R-503] Campo de visión parado y lanzado, en grados. */
 /** [R-603] Milisegundos por fotograma por encima de los cuales se simplifica. */
 const PRESUPUESTO = 30;
@@ -63,7 +62,7 @@ const RESPLANDOR = { fuerza: 0.42, radio: 0.55, umbral: 0.92 };
  * está la regata.
  */
 const VINETA = {
-  uniforms: { tDiffuse: { value: null }, fuerza: { value: 0.32 } },
+  uniforms: { tDiffuse: { value: null }, fuerza: { value: 0.32 }, rayas: { value: 0 }, tiempo: { value: 0 }, golpe: { value: 0 } },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
     void main() {
@@ -74,13 +73,31 @@ const VINETA = {
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
     uniform float fuerza;
+    uniform float rayas;
+    uniform float tiempo;
+    uniform float golpe;
     varying vec2 vUv;
+    float azar(float x) { return fract(sin(x * 127.1) * 43758.5453); }
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
       vec2 d = vUv - 0.5;
-      float v = 1.0 - fuerza * smoothstep(0.25, 0.85, dot(d, d) * 2.2);
+      float r2 = dot(d, d);
+      float v = 1.0 - fuerza * smoothstep(0.25, 0.85, r2 * 2.2);
       float luma = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-      vec3 color = mix(vec3(luma), c.rgb, 1.08);
+      // [V-205] Color de arcade: más saturado que el ×1,08 de R-505.
+      vec3 color = mix(vec3(luma), c.rgb, 1.22);
+      // [V-205] Líneas de velocidad: rayas radiales que corren hacia fuera,
+      // solo en el borde, para no tapar la regata.
+      if (rayas > 0.0) {
+        float angulo = atan(d.y, d.x);
+        float sector = floor(angulo * 36.0);
+        float fase = fract(sqrt(r2) * 3.0 - tiempo * 2.5 - azar(sector) * 3.0);
+        float raya = step(0.8, azar(sector + 0.5)) * smoothstep(0.0, 0.2, fase) * (1.0 - smoothstep(0.2, 0.6, fase));
+        float borde = smoothstep(0.1, 0.3, r2);
+        color += vec3(0.9, 0.95, 1.0) * raya * borde * rayas * 0.4;
+      }
+      // [V-305] Un golpe tiñe el borde de rojo.
+      color = mix(color, vec3(0.9, 0.05, 0.02), golpe * smoothstep(0.08, 0.3, r2) * 0.7);
       gl_FragColor = vec4(color * v, c.a);
     }
   `,
@@ -106,6 +123,11 @@ export class Vista {
   private readonly agua: Agua;
   private readonly mundo: Mundo;
   private readonly flota: Flota;
+  private readonly efectos: Efectos;
+  private readonly vineta: ShaderPass;
+  /** [V-103] Segundos que le quedan a la sacudida. */
+  private sacudida = 0;
+  private rayas = 0;
   private readonly trazado: Trazado;
   private readonly paleta: Paleta;
   private readonly circuito: Circuito;
@@ -127,7 +149,12 @@ export class Vista {
    */
   private readonly encuadre: { ritmo: number; vCasco: number };
 
-  constructor(lienzo: HTMLCanvasElement, est: EstadoRegata, encuadre: { ritmo: number; vCasco: number } = { ritmo: 1, vCasco: 8 }) {
+  constructor(
+    lienzo: HTMLCanvasElement,
+    est: EstadoRegata,
+    encuadre: { ritmo: number; vCasco: number } = { ritmo: 1, vCasco: 8 },
+    umbrales: UmbralesDeEfectos = { cenida: [Infinity, Infinity], reaparicion: 2 },
+  ) {
     this.encuadre = encuadre;
     this.circuito = est.circuito;
     this.paleta = paletaDe(est.circuito);
@@ -171,6 +198,8 @@ export class Vista {
     this.mundo = new Mundo(this.escena, est.circuito, this.trazado, this.paleta, est.huevos);
     this.flota = new Flota(est.naves, this.paleta);
     this.escena.add(this.flota.raiz);
+    this.efectos = new Efectos(this.paleta, est.naves.length, umbrales);
+    this.escena.add(this.efectos.raiz);
 
     // [R-505] HDR en coma flotante y con MSAA; el mapeo de tonos y el sRGB, al
     // final y una sola vez (`OutputPass`).
@@ -179,11 +208,13 @@ export class Vista {
     this.compositor.addPass(new RenderPass(this.escena, this.camara));
     this.resplandor = new UnrealBloomPass(new Vector2(256, 256), RESPLANDOR.fuerza, RESPLANDOR.radio, RESPLANDOR.umbral);
     this.compositor.addPass(this.resplandor);
-    this.compositor.addPass(new ShaderPass(VINETA));
+    this.vineta = new ShaderPass(VINETA);
+    this.compositor.addPass(this.vineta);
     this.compositor.addPass(new OutputPass());
 
     const jugador = est.naves.find((n) => n.jugador) ?? est.naves[0]!;
-    this.metrosCamara = jugador.metros - RETRASO_BASE - jugador.barca.eslora * RETRASO_POR_ESLORA;
+    this.metrosCamara = jugador.metros - retrasoDeCamara(jugador.barca.eslora);
+    this.lateralCamara = jugador.carril;
   }
 
   redimensionar(ancho: number, alto: number): void {
@@ -206,17 +237,33 @@ export class Vista {
 
     // [R-502] El suavizado se hace contra la distancia recorrida, no contra el
     // reloj: así el encuadre es el mismo a cualquier velocidad de simulación.
-    const retraso = RETRASO_BASE + nave.barca.eslora * RETRASO_POR_ESLORA;
-    const objetivo = nave.metros - retraso;
+    const objetivo = nave.metros - retrasoDeCamara(nave.barca.eslora);
     const mezcla = 1 - Math.pow(0.0008, dt);
     this.metrosCamara += (objetivo - this.metrosCamara) * mezcla;
-    this.lateralCamara += (nave.carril - this.lateralCamara) * mezcla;
+    // [B-303] El carril de la cámara sigue al de la barca MIENTRAS cambia, no
+    // al llegar: con el ritmo de kart el cambio dura 0,4 s y un salto se nota.
+    const avance = nave.cambiando > 0 ? 1 - nave.cambiando / 1.2 : 1;
+    const carrilVisto = nave.cambiando > 0 ? nave.carril + (nave.carrilDestino - nave.carril) * avance : nave.carril;
+    this.lateralCamara += (carrilVisto - this.lateralCamara) * (1 - Math.pow(0.02, dt));
 
-    const p = puntoEn(this.trazado, this.metrosCamara);
-    const rumbo = rumboEn(this.trazado, this.metrosCamara);
+    // [V-102] Cámara de persecución: la misma cuenta de carril que las barcas.
     const carriles = Math.max(2, Math.floor(this.anchuraDe(this.metrosCamara) / 4.5));
-    const lateral = lateralDe(this.lateralCamara, carriles, this.anchuraDe(this.metrosCamara));
-    this.camara.position.set(p.x + Math.cos(rumbo) * lateral, ALTURA, p.z - Math.sin(rumbo) * lateral);
+    const c = posicionEn(this.trazado, this.metrosCamara, this.lateralCamara, carriles);
+    let altura = alturaDeCamara(nave.barca.eslora);
+
+    // [V-103] Un golpe recibido sacude la cámara.
+    if (this.efectos.golpeEn(seguido)) this.sacudida = SACUDIDA.duracion;
+    let sx = 0;
+    let sz = 0;
+    if (this.sacudida > 0) {
+      this.sacudida = Math.max(0, this.sacudida - dt);
+      const a = SACUDIDA.amplitud * (this.sacudida / SACUDIDA.duracion);
+      const t = this.tiempoMar;
+      sx = Math.sin(t * 71) * a;
+      sz = Math.cos(t * 53) * a;
+      altura += Math.sin(t * 89) * a * 0.6;
+    }
+    this.camara.position.set(c.x + sx, altura, c.z + sz);
 
     // [R-501] Se mira al TRAZADO por delante, no a la barca.
     const mira = puntoDeMira(this.trazado, nave.metros);
@@ -244,6 +291,15 @@ export class Vista {
     this.mundo.actualizarHuevos(est.huevos, tiempoMar, oleaje);
     this.mundo.actualizarBoyas(tiempoMar, oleaje);
     this.flota.actualizar(est.naves, this.trazado, tiempoMar, oleaje, dt);
+    this.efectos.actualizar(est, this.trazado, tiempoMar, oleaje, dt, this.encuadre.ritmo);
+
+    // [V-205] [V-305] Rayas con la racha; borde rojo con el golpe.
+    const racha = nave.efectos.some((e) => e.tipo === 'turbo');
+    this.rayas += ((racha ? 1 : 0) - this.rayas) * Math.min(1, dt * 6);
+    const u = this.vineta.uniforms as Record<string, { value: number }>;
+    u.rayas!.value = this.rayas;
+    u.tiempo!.value = tiempoMar;
+    u.golpe!.value = this.sacudida > 0 ? Math.min(1, (this.sacudida / SACUDIDA.duracion) * 1.4) : 0;
 
     this.compositor.render(dt);
 
@@ -255,6 +311,7 @@ export class Vista {
       this.malos = coste > PRESUPUESTO ? this.malos + 1 : 0;
       if (this.malos > PACIENCIA) {
         this.flota.apagarEstela();
+        this.efectos.simplificar();
         this.agua.simplificar();
         // [R-603] [R-505] [R-506] El resplandor y las sombras, fuera.
         this.resplandor.enabled = false;
@@ -288,6 +345,7 @@ export class Vista {
 
   destruir(): void {
     this.flota.destruir();
+    this.efectos.destruir();
     this.mundo.destruir();
     this.agua.destruir();
     this.cielo.destruir();
