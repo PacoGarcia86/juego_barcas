@@ -182,8 +182,9 @@ export function posicionEn(
   const p = puntoEn(t, metros);
   const rumbo = rumboEn(t, metros);
   const lateral = lateralDe(carril, carriles, anchuraEn(t, metros));
-  // Perpendicular al rumbo, a estribor.
-  return { x: p.x + Math.cos(rumbo) * lateral, z: p.z - Math.sin(rumbo) * lateral, rumbo };
+  // [V-101] Perpendicular al rumbo, a estribor: `rumbo × arriba` = (−cos, +sin).
+  // Con (+cos, −sin), que es babor, el timón iba al revés en pantalla (`DK1`).
+  return { x: p.x - Math.cos(rumbo) * lateral, z: p.z + Math.sin(rumbo) * lateral, rumbo };
 }
 
 /**
@@ -195,4 +196,23 @@ export const MIRA_ADELANTE = 34;
 
 export function puntoDeMira(t: Trazado, metros: number): { x: number; z: number } {
   return puntoEn(t, metros + MIRA_ADELANTE);
+}
+
+/**
+ * [V-101] Hacia dónde queda la DERECHA de la pantalla, en el mundo, mirando por
+ * el rumbo. Con el eje Y hacia arriba es `rumbo × arriba` = (−cos, +sin).
+ */
+export function derechaDePantalla(t: Trazado, metros: number): { x: number; z: number } {
+  const rumbo = rumboEn(t, metros);
+  return { x: -Math.cos(rumbo), z: Math.sin(rumbo) };
+}
+
+/** [V-102] Metros por detrás del centro de la barca seguida. */
+export function retrasoDeCamara(eslora: number): number {
+  return 4.5 + 0.7 * eslora;
+}
+
+/** [V-102] Altura de la cámara sobre el agua. */
+export function alturaDeCamara(eslora: number): number {
+  return 3.2 + 0.18 * eslora;
 }

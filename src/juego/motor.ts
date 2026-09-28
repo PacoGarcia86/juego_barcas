@@ -37,6 +37,8 @@ export class MotorDeRegata {
    * pinta cada tick: aquí se acumulan para que ninguno se pierda.
    */
   private registro: AvisoFechado[] = [];
+  /** [V-402] Los avisos que aún no han sonado. Se vacía con `sacarAvisosNuevos`. */
+  private porSonar: AvisoFechado[] = [];
 
   /**
    * [K-101] `ritmo` son segundos de simulación por segundo real. Solo cambia
@@ -75,14 +77,33 @@ export class MotorDeRegata {
       const jugador = this.estado.naves[this.jugador];
       const ultimaVuelta = jugador !== undefined && jugador.vuelta >= this.estado.circuito.vueltas - 1;
       this.estado = avanzar(this.estado, { mando, ultimaVuelta }, this.rng);
-      for (const aviso of this.estado.avisos) this.registro.push({ reloj: this.estado.reloj, aviso });
+      for (const aviso of this.estado.avisos) {
+        this.registro.push({ reloj: this.estado.reloj, aviso });
+        this.porSonar.push({ reloj: this.estado.reloj, aviso });
+      }
       this.acumulado -= PASO;
       pasos++;
     }
-    if (this.estado.terminada && this.resultado === null) {
+    // [V-306] El resultado se fija al cruzar el JUGADOR, no al cruzar la
+    // última: su plaza ya no cambia (una llegada va siempre delante, `B-402`)
+    // y nadie puede adelantarle en la meta. La pantalla de meta sale al
+    // llegar, como en el kart, y las rivales terminan detrás, en el agua.
+    if (this.resultado === null && this.estado.naves[this.jugador]?.tiempoMeta != null) {
       const r = resultadoDe(this.estado, 0);
       this.resultado = { ...r, doblones: doblonesDe(r) };
     }
+  }
+
+  /** El jugador ha cruzado la meta. Las demás pueden seguir en el agua [V-306]. */
+  get enMeta(): boolean {
+    return this.resultado !== null;
+  }
+
+  /** [V-402] Los avisos llegados desde la última llamada, para el sonido. */
+  sacarAvisosNuevos(): AvisoFechado[] {
+    const nuevos = this.porSonar;
+    this.porSonar = [];
+    return nuevos;
   }
 
   /** [K-303] Los avisos de los últimos `segundosReales` de pantalla, del más viejo al más nuevo. */

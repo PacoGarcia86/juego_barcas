@@ -3,13 +3,16 @@
 // Este modo CONSUME el motor: no decide nada de la regata. Si te ves
 // escribiendo criterio de carrera aquí, para [WORKFLOW §3].
 
-import { useCallback, useMemo, useRef, useState } from 'react';
-import type { Circuito, Mando as MandoMotor, Oficio, Partida, Resultado } from '../engine/tipos.ts';
-import type { Inscripcion } from '../engine/carrera.ts';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Circuito, EstadoRegata, Mando as MandoMotor, Oficio, Partida, Resultado } from '../engine/tipos.ts';
+import { CARGA_CORTA, CARGA_LARGA, type Inscripcion } from '../engine/carrera.ts';
+import { REAPARICION } from '../engine/huevos.ts';
 import { barcaEfectiva } from '../engine/barcas.ts';
 import { BARCAS, barcaPorId } from '../engine/datos/barcas.ts';
 import { MotorDeRegata } from '../juego/motor.ts';
-import { segundosReales } from '../engine/ritmo.ts';
+import { RITMO, segundosReales } from '../engine/ritmo.ts';
+import { SONIDO_DE_SUCESO, sonidoDeAviso, sucesosEntre, type Suceso } from '../juego/sucesos.ts';
+import { Sintetizador } from '../sonido/sintetizador.ts';
 import type { Diagnostico } from '../render/tresd/vista.ts';
 import Lienzo from '../components/Lienzo.tsx';
 import Tablero from '../components/Tablero.tsx';
@@ -17,6 +20,8 @@ import Aliento from '../components/Aliento.tsx';
 import Mando from '../components/Mando.tsx';
 import Cuenta from '../components/Cuenta.tsx';
 import Avisos from '../components/Avisos.tsx';
+import Anuncios, { type Anuncio } from '../components/Anuncios.tsx';
+import Clasificacion from '../components/Clasificacion.tsx';
 import { velocidadDeCasco } from '../engine/fisica.ts';
 
 interface Props {
@@ -55,6 +60,31 @@ function parrilla(partida: Partida): Inscripcion[] {
   ];
 }
 
+/** [V-302] Lo que gira la ruleta antes de parar, en ms reales. */
+const RULETA_MS = 1000;
+/** [V-306] Lo que se deja ver «¡META!» antes de la tarjeta, en ms. */
+const META_MS = 2500;
+/** Lo que dura un anuncio en pantalla, en ms (la animación `aviso`). */
+const ANUNCIO_MS = 1700;
+const ORO = 'var(--color-laton-600)';
+
+/** [V-304] El cartel de cada suceso. El objeto no lleva: lo enseña la ruleta. */
+function anuncioDe(s: Suceso): Omit<Anuncio, 'id'> | null {
+  switch (s.tipo) {
+    case 'vuelta':
+      return { texto: `Vuelta ${s.vuelta}`, color: '#e8eef5' };
+    case 'ultimaVuelta':
+      return { texto: '¡Última vuelta!', color: 'var(--color-ojo)', grande: true };
+    case 'meta':
+      return { texto: '¡META!', color: ORO, grande: true };
+    case 'objeto':
+      return null;
+  }
+}
+
+/** [H-209] [V-204] Los umbrales que el render necesita y no puede importar. */
+const UMBRALES = { cenida: [CARGA_CORTA * RITMO, CARGA_LARGA * RITMO] as const, reaparicion: REAPARICION };
+
 export default function RegataMode({ circuito, partida, onTerminar, onSalir }: Props) {
   const diagnosticoPedido = useMemo(
     () => new URLSearchParams(globalThis.location?.search ?? '').get('diagnostico') === '1',
@@ -65,9 +95,38 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
     [circuito, partida],
   );
 
+  // [V-4xx] El sonido. Arranca con el primer gesto del patrón [V-404].
+  const sonido = useMemo(() => new Sintetizador(), []);
+  const [callado, setCallado] = useState(false);
+  useEffect(() => {
+    const arrancar = (): void => sonido.arrancar();
+    globalThis.addEventListener('pointerdown', arrancar);
+    globalThis.addEventListener('keydown', arrancar);
+    return () => {
+      globalThis.removeEventListener('pointerdown', arrancar);
+      globalThis.removeEventListener('keydown', arrancar);
+      sonido.destruir();
+    };
+  }, [sonido]);
+
   const [est, setEst] = useState(motor.est);
   const [diag, setDiag] = useState<Diagnostico | null>(null);
+  // [V-306] «terminada» es la regata del JUGADOR: la tarjeta sale al llegar él.
   const [terminada, setTerminada] = useState(false);
+  const [tarjeta, setTarjeta] = useState(false);
+  const [anuncios, setAnuncios] = useState<Anuncio[]>([]);
+  const [girando, setGirando] = useState(false);
+  const siguienteAnuncio = useRef(1);
+  const ultimaCuenta = useRef(-1);
+  /** [V-302] Hasta cuándo gira la ruleta (reloj de `performance.now`). */
+  const ruletaHasta = useRef(0);
+  const ultimoTic = useRef(0);
+
+  const anunciar = useCallback((a: Omit<Anuncio, 'id'>) => {
+    const id = siguienteAnuncio.current++;
+    setAnuncios((lista) => [...lista.slice(-2), { ...a, id }]);
+    setTimeout(() => setAnuncios((lista) => lista.filter((x) => x.id !== id)), ANUNCIO_MS);
+  }, []);
   const mando = useRef<MandoMotor>({ gas: 0.72, timon: 0, usar: false });
   const [mandoVisible, setMandoVisible] = useState<MandoMotor>(mando.current);
   // Cuántos fotogramas van desde el último refresco de React: el motor va a
@@ -75,22 +134,56 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
   const desde = useRef(0);
 
   const alFotograma = useCallback(
-    (dt: number) => {
-      motor.tictac(dt, mando.current);
+    (dt: number): EstadoRegata => {
+      const ahora = performance.now();
+      const antes = motor.est;
+      // [V-302] Mientras gira la ruleta no se suelta nada.
+      const ruleta = ahora < ruletaHasta.current;
+      motor.tictac(dt, ruleta ? { ...mando.current, usar: false } : mando.current);
       // El «usar» es de un solo tick: si se quedara pegado, un toque gastaría
       // el objeto y el guardado seguidos.
       if (mando.current.usar) mando.current = { ...mando.current, usar: false };
+      const despues = motor.est;
+      const jugador = motor.jugador;
+
+      // [V-402] La cuenta atrás suena número a número, y el ¡ya!, con bocina.
+      const cuenta = despues.cuentaAtras > 0 ? Math.ceil(segundosReales(despues.cuentaAtras) - 1e-9) : 0;
+      if (cuenta !== ultimaCuenta.current) {
+        if (ultimaCuenta.current !== -1 || cuenta > 0) sonido.tocar(cuenta > 0 ? 'cuenta' : 'salida');
+        ultimaCuenta.current = cuenta;
+      }
+      // [V-402] Lo que avisa el motor (`K-303`), al altavoz.
+      for (const { aviso } of motor.sacarAvisosNuevos()) sonido.tocar(sonidoDeAviso(aviso));
+      // [V-304] Y lo que no avisa: vuelta, última vuelta, objeto nuevo, meta.
+      for (const s of sucesosEntre(antes, despues, jugador)) {
+        sonido.tocar(SONIDO_DE_SUCESO[s.tipo]);
+        if (s.tipo === 'objeto') {
+          ruletaHasta.current = ahora + RULETA_MS;
+          setGirando(true);
+          setTimeout(() => setGirando(false), RULETA_MS);
+        }
+        const anuncio = anuncioDe(s);
+        if (anuncio !== null) anunciar(anuncio);
+      }
+      if (ruleta && ahora - ultimoTic.current > 85) {
+        ultimoTic.current = ahora;
+        sonido.tocar('ruleta');
+      }
+      const nave = despues.naves[jugador];
+      if (nave !== undefined) sonido.ambiente(dt, nave.tiempoMeta === null ? nave.velocidad * motor.ritmo : 0, nave.gas);
+
       if (++desde.current >= 6) {
         desde.current = 0;
-        setEst(motor.est);
+        setEst(despues);
       }
-      if (motor.terminada && !terminada) {
+      if (motor.enMeta && !terminada) {
         setTerminada(true);
-        setEst(motor.est);
+        setEst(despues);
+        setTimeout(() => setTarjeta(true), META_MS);
       }
-      return motor.est;
+      return despues;
     },
-    [motor, terminada],
+    [motor, terminada, sonido, anunciar],
   );
 
   const cambiarMando = useCallback((m: MandoMotor) => {
@@ -114,22 +207,38 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
         alFotograma={alFotograma}
         seguido={jugador}
         encuadre={encuadre}
+        umbrales={UMBRALES}
         onDiagnostico={diagnosticoPedido ? setDiag : undefined}
       />
 
-      <Tablero est={est} orden={motor.orden} jugador={jugador} />
+      <Tablero est={est} orden={motor.orden} jugador={jugador} girando={girando} ritmo={motor.ritmo} />
+      <Clasificacion est={est} orden={motor.orden} jugador={jugador} />
+      <Anuncios avisos={anuncios} />
       {/* [K-302] [K-303] */}
       <Cuenta est={est} />
       {!terminada && <Avisos avisos={motor.avisosRecientes(2)} naves={est.naves} />}
       {nave !== undefined && <Aliento nave={nave} />}
       {!terminada && (
-        <Mando valor={mandoVisible} onCambio={cambiarMando} puedeUsar={nave?.objeto != null} />
+        <Mando valor={mandoVisible} onCambio={cambiarMando} puedeUsar={nave?.objeto != null && !girando} />
       )}
 
-      <button className="boton absolute right-3 px-3 py-1 text-xs"
-        style={{ top: 'calc(var(--safe-t) + 7.5rem)' }} onClick={onSalir}>
-        dejarlo
-      </button>
+      {/* [V-303] Debajo del marcador: ya no tapa la casilla del objeto. */}
+      <div className="absolute right-3 flex gap-2" style={{ top: 'calc(var(--safe-t) + 6.2rem)' }}>
+        <button
+          aria-label={callado ? 'Con sonido' : 'Sin sonido'}
+          className="boton px-3 py-1 text-xs"
+          onClick={() => {
+            sonido.arrancar();
+            sonido.silenciar(!callado);
+            setCallado(!callado);
+          }}
+        >
+          {callado ? '🔇' : '🔊'}
+        </button>
+        <button className="boton px-3 py-1 text-xs" onClick={onSalir}>
+          dejarlo
+        </button>
+      </div>
 
       {/* [R-602] `?diagnostico=1` */}
       {diag !== null && (
@@ -140,7 +249,7 @@ export default function RegataMode({ circuito, partida, onTerminar, onSalir }: P
         </p>
       )}
 
-      {terminada && final !== null && (
+      {tarjeta && final !== null && (
         <div className="absolute inset-0 grid place-items-center bg-honda-900/85 p-4 backdrop-blur-sm">
           <div className="tarjeta entrar grid w-full max-w-sm gap-3 p-5">
             <p className="text-xs font-semibold tracking-[0.3em] text-laton-500">META</p>

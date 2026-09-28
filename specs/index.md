@@ -1,6 +1,6 @@
 # Especificaciones — Índice y enrutado
 
-**Actualizado:** 2026-09-23
+**Actualizado:** 2026-09-28
 
 Este fichero es el punto de entrada. **Lee esto primero y carga solo la sección a la que te
 enrute**, no el documento entero. El flujo de trabajo está en [`WORKFLOW.md`](WORKFLOW.md).
@@ -46,6 +46,11 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | Guardar la partida, migración, almacenamiento bloqueado | `005` §5 `P-1xx` |
 | Instalar en Android e iOS, manifiesto, iconos | `005` §5 `P-2xx` |
 | Despliegue en Firebase Hosting, caché, integración continua | `005` §5 `P-3xx` + [`../DEPLOYMENT.md`](../DEPLOYMENT.md) |
+| **Hacia dónde va el timón en la pantalla**, dónde se dibuja la boya | `007` §5 `V-101` · §3 `DV1` — **antes de tocar un vector perpendicular al rumbo** |
+| Distancia y altura de la cámara | `007` §5 `V-102` (sustituye las cifras de `R-501`) |
+| Objetos y efectos en la escena, partículas, huevos de colores | `007` §5 `V-2xx` |
+| Ruleta, anuncios de vuelta y meta, tira de clasificación | `007` §5 `V-3xx` |
+| Sonido | `007` §5 `V-4xx` |
 | **Ritmo de kart: por qué la regata va más rápida sin tocar la física** (reloj de juego, `RITMO`) | `006` §4 · §5 `K-101` — **léelo antes de cambiar velocidades o duraciones** |
 | Duración de la regata, longitud de los circuitos recortados | `006` §5 `K-102` · §3 `DK1` |
 | Cada cuánto pasa algo: cadencia de huevos, hueco sin acontecimiento | `006` §5 `K-201` · §3 `DK3`/`DK4` |
@@ -68,6 +73,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1, R2 y R3) |
 | [SPEC-005](005-progreso-y-despliegue.md) | Progreso, aplicación y despliegue | `P-` | ✅ COMPLETADA (Fase P1) |
 | [SPEC-006](006-ritmo-de-kart.md) | Ritmo de kart | `K-` | ✅ COMPLETADA (Fases K1, K2 y K3) |
+| [SPEC-007](007-que-se-vea-y-suene.md) | Que se vea y que suene | `V-` | ✅ COMPLETADA (Fase V1) |
 
 ---
 
@@ -83,8 +89,9 @@ Un prefijo por documento, para que un `grep '\[B-2'` no cruce especificaciones.
 | `R-` | SPEC-004 · render del agua |
 | `P-` | SPEC-005 · progreso y despliegue |
 | `K-` | SPEC-006 · ritmo de kart |
+| `V-` | SPEC-007 · que se vea y que suene |
 
-**Libres:** `C-` `D-` `E-` `F-` `G-` `I-` `J-` `L-` `M-` `N-` `O-` `Q-` `S-` `T-` `U-` `V-`
+**Libres:** `C-` `D-` `E-` `F-` `G-` `I-` `J-` `L-` `M-` `N-` `O-` `Q-` `S-` `T-` `U-`
 `W-` `X-` `Y-` `Z-`.
 
 ---
@@ -99,7 +106,6 @@ Se anota aquí para que no se pierda. No es una promesa de calendario.
 | Regatas de varias vueltas con paradas de avituallamiento | `001` `BQ2` | La energía ya se agota y recupera (`B-208`), pero no hay parada que la reponga de golpe |
 | Multijugador en el mismo dispositivo (pantalla partida) | `004` `RQ1` | La vista es una sola cámara (`R-501`); partirla obliga a duplicar el post-proceso |
 | Partidas en la nube y varios dispositivos | `005` `PQ1` | Hoy el progreso es local (`P-101`) y el juego funciona sin servidor |
-| Sonido: remos, agua, choques, la bocina de meta | — | No hay especificación todavía. Sigue el protocolo de `WORKFLOW.md` §2 |
 | El arnés de capturas dibuja por software y no mide fotogramas de verdad | `004` `RG2` | SwiftShader en el contenedor. Lo que sí mide son llamadas de dibujo, triángulos y **lo que se ve**, que es lo que encontró `DR1`, `DR6` y `DR7` |
 | Tres vueltas por regata, como en el kart | `006` `KQ2` | Solo caben recortando la geometría, y eso rompe `B-202` (patín 62 %, trainera y galeota 0 %). Haría falta rediseñar los circuitos, no escalarlos |
 | El arnés de regata (`regata-humo`, `baseline`) imprime tiempos de simulación, no de pantalla | `006` `K-101` | Sus umbrales de SPEC-001 están en simulación y siguen valiendo; `npm run diversion` es el que habla en tiempo real |
