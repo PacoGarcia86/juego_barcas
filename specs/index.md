@@ -1,6 +1,6 @@
 # Especificaciones — Índice y enrutado
 
-**Actualizado:** 2026-09-23
+**Actualizado:** 2026-09-28
 
 Este fichero es el punto de entrada. **Lee esto primero y carga solo la sección a la que te
 enrute**, no el documento entero. El flujo de trabajo está en [`WORKFLOW.md`](WORKFLOW.md).
@@ -46,6 +46,14 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | Guardar la partida, migración, almacenamiento bloqueado | `005` §5 `P-1xx` |
 | Instalar en Android e iOS, manifiesto, iconos | `005` §5 `P-2xx` |
 | Despliegue en Firebase Hosting, caché, integración continua | `005` §5 `P-3xx` + [`../DEPLOYMENT.md`](../DEPLOYMENT.md) |
+| **Hacia dónde va el timón en la pantalla**, dónde se dibuja la boya | `006` §5 `K-101` · §3 `DK1` — **antes de tocar un vector perpendicular al rumbo** |
+| Cámara de persecución, sacudida, líneas de velocidad | `006` §5 `K-102`/`K-103`/`K-305` (sustituye las cifras de `R-501`) |
+| **Ritmo de juego**: por qué la regata va a ×3 y el motor no se entera | `006` §5 `K-201` · §3 `DK4` |
+| Cuenta atrás, salida perfecta y calada | `006` §5 `K-202`/`K-203` |
+| **Ceñir la boya** (el turbo de habilidad) | `006` §5 `K-204` |
+| Objetos y efectos en la escena, partículas | `006` §5 `K-3xx` |
+| Ruleta, avisos, clasificación en pantalla | `006` §5 `K-4xx` |
+| Sonido | `006` §5 `K-5xx` |
 
 **Si tu tarea no aparece aquí**, no improvises: sigue el *Protocolo de nueva especificación* de
 [`WORKFLOW.md`](WORKFLOW.md) §2.
@@ -61,6 +69,7 @@ Busca tu tarea, carga **solo** los apartados de la derecha.
 | [SPEC-003](003-astillero-y-tripulacion.md) | El astillero y la tripulación | `A-` | ✅ COMPLETADA (Fase A1) |
 | [SPEC-004](004-render-del-agua.md) | El render del agua | `R-` | ✅ COMPLETADA (Fases R1, R2 y R3) |
 | [SPEC-005](005-progreso-y-despliegue.md) | Progreso, aplicación y despliegue | `P-` | ✅ COMPLETADA (Fase P1) |
+| [SPEC-006](006-regata-arcade.md) | Regata arcade: que se vea, que suene y que se juegue | `K-` | ✅ COMPLETADA (Fase K1) |
 
 ---
 
@@ -75,8 +84,9 @@ Un prefijo por documento, para que un `grep '\[B-2'` no cruce especificaciones.
 | `A-` | SPEC-003 · astillero y tripulación |
 | `R-` | SPEC-004 · render del agua |
 | `P-` | SPEC-005 · progreso y despliegue |
+| `K-` | SPEC-006 · regata arcade |
 
-**Libres:** `C-` `D-` `E-` `F-` `G-` `I-` `J-` `K-` `L-` `M-` `N-` `O-` `Q-` `S-` `T-` `U-` `V-`
+**Libres:** `C-` `D-` `E-` `F-` `G-` `I-` `J-` `L-` `M-` `N-` `O-` `Q-` `S-` `T-` `U-` `V-`
 `W-` `X-` `Y-` `Z-`.
 
 ---
@@ -91,6 +101,7 @@ Se anota aquí para que no se pierda. No es una promesa de calendario.
 | Regatas de varias vueltas con paradas de avituallamiento | `001` `BQ2` | La energía ya se agota y recupera (`B-208`), pero no hay parada que la reponga de golpe |
 | Multijugador en el mismo dispositivo (pantalla partida) | `004` `RQ1` | La vista es una sola cámara (`R-501`); partirla obliga a duplicar el post-proceso |
 | Partidas en la nube y varios dispositivos | `005` `PQ1` | Hoy el progreso es local (`P-101`) y el juego funciona sin servidor |
-| Sonido: remos, agua, choques, la bocina de meta | — | No hay especificación todavía. Sigue el protocolo de `WORKFLOW.md` §2 |
 | El arnés de capturas dibuja por software y no mide fotogramas de verdad | `004` `RG2` | SwiftShader en el contenedor. Lo que sí mide son llamadas de dibujo, triángulos y **lo que se ve**, que es lo que encontró `DR1`, `DR6` y `DR7` |
+| La IA también ciñe las boyas | `006` `KQ1` | Movería la puerta de SPEC-001; hoy la ceñida es habilidad del jugador |
+| Música de regata | `006` `KQ2` | Hay sonidos de suceso y ambiente (`K-5xx`), no banda sonora |
 | Olas de Gerstner que empujen de verdad a la barca | `004` `RQ2` | Hoy el oleaje del motor (`B-207`) y el del render (`R-201`) son dos cuentas distintas: se ven iguales pero no lo son |

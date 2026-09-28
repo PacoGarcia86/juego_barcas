@@ -100,7 +100,7 @@ export function boyasDe(circuito: Circuito): { metros: number; radio: number; in
  * [B-306] Factor de longitud del recorrido según el carril en una curva.
  *
  * Por fuera se recorre más agua; por dentro, menos. El carril interior de una
- * curva a estribor (`radio > 0`) es el 0. Fuera de una curva, todos los
+ * curva a babor (`radio > 0`) es el 0 [K-101]. Fuera de una curva, todos los
  * carriles recorren lo mismo: en una recta el carril no alarga nada.
  */
 export function factorDeCarril(tramo: Tramo, carril: number): number {

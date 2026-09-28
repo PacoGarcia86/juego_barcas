@@ -68,6 +68,11 @@ export const ORDEN_DEL_TICK = [
 const HUECO_MINIMO = 2.5;
 /** [B-303] Lo que dura un cambio de carril, s. */
 const DURACION_CAMBIO = 1.2;
+/** [K-204] Segundos de ceñida para el primer nivel de turbo, y para el segundo. */
+export const CENIDA_NIVEL_1 = 2.5;
+export const CENIDA_NIVEL_2 = 5;
+/** [K-204] Por debajo de esto no se ciñe nada: se está parado junto a la boya. */
+const CENIDA_VELOCIDAD_MINIMA = 1.5;
 /** [B-702] Segundos que una rival tiene que aguantar delante para que cuente. */
 export const HISTERESIS_ADELANTAMIENTO = 3;
 
@@ -136,6 +141,7 @@ export function crearRegata(circuito: Circuito, inscritos: Inscripcion[], rng: R
     objeto: null,
     guardado: null,
     efectos: [],
+    cenida: 0,
     vuelta: 0,
     huevosRotos: 0,
     tiempoMeta: null,
@@ -268,6 +274,35 @@ export function avanzar(est: EstadoRegata, ctx: ContextoConTraza, rng: Rng): Est
         }
       }
     }
+    // [K-204] Ceñir la boya: apretar el timón hacia dentro desde el carril
+    // interior de una curva. El cambio que pide se rechaza (no hay carril), y
+    // ese empeño es lo que carga. La IA nunca aprieta contra el borde porque
+    // `carrilLibre` ya le dice que no hay sitio, así que no ciñe.
+    {
+      const punto = puntoDe(est.circuito, nave.metros);
+      const tramo = punto.tramo;
+      const dentro = tramo.radio > 0 ? -1 : 1;
+      const interior = tramo.radio > 0 ? 0 : carrilesDisponiblesEn(est.circuito, nave.metros) - 1;
+      const ciniendo =
+        tramo.tipo === 'curva' &&
+        nave.cambiando === 0 &&
+        nave.carril === interior &&
+        Math.sign(mandos[i]!.timon) === dentro &&
+        nave.velocidad > CENIDA_VELOCIDAD_MINIMA &&
+        !tieneEfecto(nave.efectos, 'giro') &&
+        !tieneEfecto(nave.efectos, 'ciego');
+      if (ciniendo) {
+        nave.cenida += dt;
+      } else if (nave.cenida > 0) {
+        const perdida = tieneEfecto(nave.efectos, 'giro') || tieneEfecto(nave.efectos, 'ciego');
+        if (!perdida && nave.cenida >= CENIDA_NIVEL_1) {
+          const restante = nave.cenida >= CENIDA_NIVEL_2 ? 6 : 3;
+          nave.efectos.push({ tipo: 'turbo', restante, factor: 1.65 });
+        }
+        nave.cenida = 0;
+      }
+    }
+
     // El carril puede dejar de existir al entrar en un estrecho.
     const carriles = carrilesDisponiblesEn(est.circuito, nave.metros);
     if (nave.carril >= carriles) nave.carril = carriles - 1;
